@@ -6,6 +6,7 @@
 <title>🏆 Koppy Kup Classic</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --bg:#f8fafc;--bg2:#f1f5f9;--bg3:#e2e8f0;
@@ -48,6 +49,7 @@ body{background:var(--bg);min-height:100vh;font-family:'Source Sans 3',sans-seri
 .tabs::-webkit-scrollbar{display:none;}
 .tbtn{flex-shrink:0;padding:11px 10px;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:inherit;font-size:11px;cursor:pointer;letter-spacing:.3px;color:var(--mu);white-space:nowrap;}
 .tbtn.active{color:var(--gl);border-bottom-color:var(--gl);font-weight:700;background:var(--gp);}
+/* SCORECARD */
 .scwrap{padding:10px 6px;}
 .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 table{border-collapse:collapse;width:100%;min-width:680px;}
@@ -71,6 +73,9 @@ table{border-collapse:collapse;width:100%;min-width:680px;}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .wrow td{background:var(--bg2);border-top:1px solid var(--bor);}
 .wcell{text-align:center;font-size:12px;height:22px;}
+.notecell{text-align:center;height:20px;}
+.note-dot{font-size:11px;cursor:pointer;opacity:.6;}
+.note-dot.has-note{opacity:1;color:var(--blue);}
 .sumc{text-align:center;font-size:13px;font-weight:700;color:var(--tx2);min-width:36px;}
 .totc{text-align:center;font-size:15px;font-weight:700;color:var(--tx);min-width:42px;}
 .pdc{text-align:center;font-size:12px;font-weight:700;min-width:40px;}
@@ -79,6 +84,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .pbwrap{padding:14px 12px 6px;text-align:center;}
 .pbtn2{width:100%;padding:15px;background:linear-gradient(135deg,#92400e,#b45309,#d97706,#f59e0b,#d97706,#b45309);background-size:200% 200%;animation:goldShimmer 2.5s ease infinite;border:2px solid #fbbf24;border-radius:12px;color:#fff;font-family:'Playfair Display',serif;font-size:17px;font-weight:900;cursor:pointer;letter-spacing:1px;text-shadow:0 2px 4px rgba(0,0,0,.5);box-shadow:0 4px 20px rgba(245,158,11,.3);}
 @keyframes goldShimmer{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+/* MOMENTUM */
 .momwrap{padding:14px 12px;}
 .sec-title{font-size:11px;letter-spacing:1.5px;color:var(--gl);margin-bottom:12px;text-transform:uppercase;font-weight:700;}
 .mom-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
@@ -88,6 +94,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .mom-sub{font-size:10px;color:var(--mu);margin-top:3px;}
 .hole-strip{display:flex;gap:3px;margin-bottom:20px;flex-wrap:wrap;}
 .hs{width:calc((100% - 51px)/18);min-width:16px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;}
+/* TRASH */
 .ttfeed{overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 340px);min-height:200px;}
 .ttfeed::-webkit-scrollbar{width:3px;}
 .ttfeed::-webkit-scrollbar-thumb{background:var(--bor);border-radius:2px;}
@@ -97,16 +104,17 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .ttmsg-time{font-size:10px;color:var(--mu);}
 .ttmsg-text{font-size:14px;line-height:1.4;color:var(--tx);}
 .ttmsg-reactions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
-.react-btn{background:var(--bg2);border:1px solid var(--bor);border-radius:20px;padding:3px 8px;font-size:12px;cursor:pointer;transition:all .15s;}
+.react-btn{background:var(--bg2);border:1px solid var(--bor);border-radius:20px;padding:3px 8px;font-size:12px;cursor:pointer;}
 .react-btn.reacted{background:#dcfce7;border-color:#16a34a;}
 .ttinput-area{padding:10px 12px;border-top:1px solid var(--bor);background:#fff;}
 .ttrow{display:flex;gap:8px;align-items:flex-end;}
 .ttinput{flex:1;background:var(--bg2);border:1px solid var(--bor);border-radius:9px;padding:9px 12px;color:var(--tx);font-family:inherit;font-size:16px;resize:none;outline:none;}
 .ttinput:focus{border-color:var(--gl);}
 .ttsend{background:var(--gb);border:none;border-radius:9px;color:#fff;padding:9px 14px;font-size:18px;cursor:pointer;flex-shrink:0;}
-.tt-sender-sel{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;padding:8px 12px 0;}
+.tt-sender-sel{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;}
 .tt-sel-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--bor);background:#fff;font-family:inherit;font-size:11px;cursor:pointer;color:var(--mu);}
 .empty-feed{text-align:center;padding:40px 20px;color:var(--mu);font-size:13px;}
+/* SIDE BETS */
 .sbwrap{padding:14px 12px;}
 .sb-hole-card{background:#fff;border:1px solid var(--bor);border-radius:10px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow);}
 .sb-hole-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
@@ -118,6 +126,23 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .sb-wbtn{flex:1;padding:6px 4px;border-radius:7px;border:1px solid var(--bor);background:var(--bg2);font-family:inherit;font-size:11px;cursor:pointer;color:var(--mu);text-align:center;}
 .sb-wbtn.sel1{background:#dcfce7;border-color:#16a34a;color:#15803d;font-weight:700;}
 .sb-wbtn.sel2{background:#fee2e2;border-color:#dc2626;color:#dc2626;font-weight:700;}
+/* PHOTOS */
+.photowrap{padding:14px 12px;}
+.photo-upload-bar{background:#fff;border:1px solid var(--bor);border-radius:12px;padding:14px;margin-bottom:16px;box-shadow:var(--shadow);}
+.photo-upload-bar p{font-size:12px;color:var(--mu);margin-bottom:10px;}
+.photo-upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.hole-sel{padding:8px 10px;background:var(--bg2);border:1px solid var(--bor);border-radius:8px;font-family:inherit;font-size:16px;color:var(--tx);flex:1;min-width:120px;}
+.upload-btn{background:var(--gb);border:none;border-radius:8px;color:#fff;padding:9px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
+.photo-gallery{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.photo-hole-group{background:#fff;border:1px solid var(--bor);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);}
+.photo-hole-hdr{padding:8px 12px;background:var(--gp);font-size:12px;font-weight:700;color:var(--gl);}
+.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px;}
+.photo-thumb{position:relative;aspect-ratio:1;overflow:hidden;border-radius:6px;background:var(--bg2);}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;cursor:pointer;}
+.photo-thumb-lbl{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.5);color:#fff;font-size:9px;padding:3px 5px;text-align:center;}
+.photo-del{position:absolute;top:3px;right:3px;background:rgba(220,38,38,.8);border:none;border-radius:50%;width:20px;height:20px;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.no-photos{text-align:center;padding:30px;color:var(--mu);font-size:13px;}
+/* HISTORY */
 .histwrap{padding:14px 12px;}
 .hist-year-card{background:#fff;border:1px solid var(--bor);border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow);}
 .hist-year-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
@@ -142,6 +167,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .series-label{font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
 .series-record{font-family:'Playfair Display',serif;font-size:28px;font-weight:900;color:var(--tx);}
 .series-names{font-size:11px;color:var(--mu);margin-top:4px;}
+/* RECAP */
 .recapwrap{padding:14px 12px;}
 .recap-card{background:#fff;border:2px solid #fde68a;border-radius:16px;padding:20px;margin-bottom:14px;box-shadow:var(--shadow);}
 .recap-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--gold);text-align:center;margin-bottom:4px;}
@@ -159,9 +185,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .moment-icon{font-size:20px;width:32px;text-align:center;flex-shrink:0;}
 .moment-text{font-size:13px;line-height:1.4;color:var(--tx);}
 .moment-sub{font-size:11px;color:var(--mu);}
+.export-btns{display:flex;gap:8px;margin-bottom:10px;}
+.export-btn{flex:1;padding:12px;border:none;border-radius:9px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
+.export-btn.pdf{background:#dc2626;color:#fff;}
+.export-btn.img{background:var(--blue);color:#fff;}
 .share-btn{width:100%;padding:13px;background:var(--gb);border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;}
-
-/* ── SETUP ── */
+/* SETUP */
 .setupwrap{padding:14px 12px;}
 .stitle{font-size:11px;letter-spacing:1.5px;color:var(--gl);margin-bottom:12px;text-transform:uppercase;font-weight:700;}
 .team-card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow);}
@@ -176,8 +205,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .pnum{font-size:11px;color:var(--mu);width:16px;text-align:right;flex-shrink:0;}
 .pinput{flex:1;padding:7px 10px;background:var(--bg2);border:1px solid var(--bor);border-radius:7px;color:var(--tx);font-family:inherit;font-size:16px;}
 .pinput:focus{outline:none;border-color:var(--gl);}
-
-/* Course setup */
+/* Course */
 .course-card{background:#fff;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow);}
 .course-name-row{display:flex;gap:8px;margin-bottom:14px;align-items:center;}
 .course-name-input{flex:1;padding:9px 12px;background:var(--bg2);border:1px solid var(--bor);border-radius:8px;color:var(--tx);font-family:inherit;font-size:16px;font-weight:700;}
@@ -187,16 +215,25 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .par-hole-lbl{font-size:9px;color:var(--mu);font-weight:700;}
 .par-input{width:100%;text-align:center;padding:6px 2px;background:var(--bg2);border:1px solid var(--bor);border-radius:6px;color:var(--tx);font-family:inherit;font-size:16px;font-weight:700;}
 .par-input:focus{outline:none;border-color:var(--gl);}
-.par-totals{display:flex;gap:10px;margin-top:8px;font-size:11px;color:var(--mu);}
+.par-totals{display:flex;gap:10px;margin-top:8px;font-size:11px;}
 .par-total-chip{background:var(--gp);border:1px solid #bbf7d0;border-radius:6px;padding:4px 10px;color:var(--gl);font-weight:700;}
 .course-save-btn{width:100%;padding:11px;background:var(--gb);border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
-
+/* Custom prizes */
+.prize-card{background:#fff;border:1px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow);}
+.prize-input-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.prize-num{font-size:14px;width:24px;flex-shrink:0;text-align:center;}
+.prize-input{flex:1;padding:7px 10px;background:var(--bg2);border:1px solid var(--bor);border-radius:7px;color:var(--tx);font-family:inherit;font-size:14px;}
+.prize-input:focus{outline:none;border-color:var(--gold);}
+.prize-save-btn{width:100%;padding:10px;background:var(--gold);border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;}
+/* Game controls */
+.clear-btn{width:100%;padding:12px;background:#fff;border:1px solid #fca5a5;border-radius:9px;color:#dc2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;}
+.clear-btn:active{background:#fee2e2;}
+.clear-btn.danger{border-color:#dc2626;background:#fff5f5;}
 .div{height:1px;background:var(--bor);margin:16px 0;}
 .snbtn{width:100%;padding:12px;background:var(--gb);border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;}
 .ibox{margin-top:12px;padding:12px;border-radius:9px;font-size:12px;line-height:1.7;}
 .ibox.g{background:var(--gp);border:1px solid #bbf7d0;color:var(--gl);}
-
-/* Prize modal */
+/* Modals */
 .moverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(4px);}
 .moverlay.hidden{display:none;}
 .pmodal{background:#fff;border:2px solid #fde68a;border-radius:20px;width:100%;max-width:360px;padding:24px 20px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);}
@@ -212,9 +249,25 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 #scratch-canvas{position:absolute;inset:0;border-radius:12px;}
 .shint{font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:16px;}
 .pclose{background:var(--bg2);border:1px solid var(--bor);border-radius:9px;color:var(--mu);padding:9px 26px;font-family:inherit;font-size:13px;cursor:pointer;}
+/* Note modal */
+.note-modal{background:#fff;border-radius:14px;width:100%;max-width:340px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.note-modal h3{font-size:15px;font-weight:700;color:var(--tx);margin-bottom:12px;}
+.note-textarea{width:100%;padding:10px 12px;background:var(--bg2);border:1px solid var(--bor);border-radius:8px;color:var(--tx);font-family:inherit;font-size:16px;min-height:80px;resize:none;outline:none;margin-bottom:10px;}
+.note-textarea:focus{border-color:var(--blue);}
+.note-btns{display:flex;gap:8px;}
+.note-save{flex:1;padding:10px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
+.note-cancel{padding:10px 16px;background:var(--bg2);border:1px solid var(--bor);border-radius:8px;color:var(--mu);font-family:inherit;font-size:13px;cursor:pointer;}
+.note-del{padding:10px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;color:#dc2626;font-family:inherit;font-size:13px;cursor:pointer;}
+/* Photo lightbox */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}
+.lightbox.hidden{display:none;}
+.lightbox img{max-width:100%;max-height:90vh;border-radius:8px;object-fit:contain;}
+.lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;border-radius:50%;width:36px;height:36px;color:#fff;font-size:18px;cursor:pointer;}
+/* Confetti */
 .confwrap{position:fixed;inset:0;pointer-events:none;z-index:99;overflow:hidden;}
 .cp{position:absolute;top:-10px;width:10px;height:10px;opacity:0;animation:cfall linear forwards;}
 @keyframes cfall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(110vh) rotate(720deg)}}
+/* Loading / Config */
 .loading{text-align:center;padding:60px 20px;color:var(--mu);}
 .spin{display:inline-block;width:24px;height:24px;border:2px solid var(--bor);border-top-color:var(--gb);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:10px;}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -226,11 +279,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .cfgf input{width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--bor);border-radius:8px;color:var(--tx);font-family:inherit;font-size:13px;}
 .cfgf input:focus{outline:none;border-color:var(--gl);}
 .cfgsave{width:100%;padding:12px;background:var(--gb);border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
-.clear-btn{width:100%;padding:12px;background:#fff;border:1px solid #fca5a5;border-radius:9px;color:#dc2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;}
-.clear-btn:active{background:#fee2e2;}
-.clear-btn.danger{border-color:#dc2626;background:#fff5f5;}
-.clear-btn.danger:active{background:#fee2e2;}
-.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);padding:9px 20px;border-radius:9px;font-size:13px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.2);z-index:200;animation:tin .25s ease;pointer-events:none;white-space:nowrap;}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);padding:9px 20px;border-radius:9px;font-size:13px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.2);z-index:300;animation:tin .25s ease;pointer-events:none;white-space:nowrap;}
 .toast.s{background:#166534;border:1px solid #4ade80;color:#fff;}
 .toast.e{background:#7f1d1d;border:1px solid #f87171;color:#fff;}
 @keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -241,7 +290,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 <div id="cfg-screen" style="display:none;padding:14px;">
   <div class="cfgscreen">
     <h2>⚙️ First-Time Setup</h2>
-    <p>Enter your Supabase project URL and anon key. See README for instructions.</p>
+    <p>Enter your Supabase project URL and anon key.</p>
     <div class="cfgf"><label>SUPABASE URL</label><input id="cu" type="text" placeholder="https://xxxx.supabase.co"/></div>
     <div class="cfgf"><label>SUPABASE ANON KEY</label><input id="ck" type="text" placeholder="eyJ..."/></div>
     <button class="cfgsave" onclick="saveConfig()">Save & Continue →</button>
@@ -296,11 +345,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <button class="tbtn" onclick="swTab('momentum',this)">📈 Momentum</button>
     <button class="tbtn" onclick="swTab('trash',this)">💬 Trash Talk</button>
     <button class="tbtn" onclick="swTab('sidebets',this)">🎯 Side Bets</button>
+    <button class="tbtn" onclick="swTab('photos',this)">📸 Photos</button>
     <button class="tbtn" onclick="swTab('history',this)">🏅 History</button>
     <button class="tbtn" onclick="swTab('recap',this)">🎉 Recap</button>
     <button class="tbtn" onclick="swTab('setup',this)">⚙️ Setup</button>
   </div>
 
+  <!-- SCORECARD -->
   <div id="tab-scorecard">
     <div class="scwrap">
       <div class="tscroll">
@@ -311,15 +362,17 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
             <tr class="trow" id="t1row" style="border-color:rgba(22,163,74,.4)"></tr>
             <tr class="trow" id="t2row" style="border-color:rgba(220,38,38,.4)"></tr>
             <tr class="wrow" id="wrow"></tr>
+            <tr id="noterow"></tr>
           </tbody>
         </table>
       </div>
       <div class="lgnd">
         <div class="li"><div style="width:16px;height:16px;background:#fef08a;border:2px solid #ca8a04;border-radius:50%;"></div>Eagle</div>
         <div class="li"><div style="width:16px;height:16px;background:#bbf7d0;border:2px solid #16a34a;border-radius:50%;"></div>Birdie</div>
-        <div class="li"><div style="width:16px;height:16px;background:rgba(255,255,255,.08);border:1px solid #374151;border-radius:3px;"></div>Par</div>
+        <div class="li"><div style="width:16px;height:16px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:3px;"></div>Par</div>
         <div class="li"><div style="width:16px;height:16px;background:#fed7aa;border:1px solid #ea580c;border-radius:3px;"></div>Bogey</div>
         <div class="li"><div style="width:16px;height:16px;background:#fecaca;border:2px solid #dc2626;border-radius:3px;"></div>Double+</div>
+        <div class="li">📝 = hole note</div>
       </div>
     </div>
     <div class="pbwrap">
@@ -327,6 +380,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
   </div>
 
+  <!-- MOMENTUM -->
   <div id="tab-momentum" style="display:none;">
     <div class="momwrap">
       <div class="sec-title">Momentum Tracker</div>
@@ -334,10 +388,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div class="sec-title">Hole-by-Hole Control</div>
       <div class="hole-strip" id="hole-strip"></div>
       <div class="sec-title">Swing Chart</div>
-      <canvas id="swing-canvas" style="width:100%;height:120px;border-radius:8px;background:rgba(0,0,0,.3);"></canvas>
+      <canvas id="swing-canvas" style="width:100%;height:120px;border-radius:8px;background:var(--bg2);"></canvas>
     </div>
   </div>
 
+  <!-- TRASH TALK -->
   <div id="tab-trash" style="display:none;">
     <div class="tt-sender-sel" id="tt-sender-sel"></div>
     <div class="ttfeed" id="ttfeed"><div class="empty-feed">🤫 No trash talk yet.<br/>Someone start something.</div></div>
@@ -349,6 +404,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
   </div>
 
+  <!-- SIDE BETS -->
   <div id="tab-sidebets" style="display:none;">
     <div class="sbwrap">
       <div class="sec-title">Side Bets by Hole</div>
@@ -356,6 +412,25 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
   </div>
 
+  <!-- PHOTOS -->
+  <div id="tab-photos" style="display:none;">
+    <div class="photowrap">
+      <div class="photo-upload-bar">
+        <p>📸 Add a photo to any hole — visible to both teams instantly.</p>
+        <div class="photo-upload-row">
+          <select class="hole-sel" id="photo-hole-sel">
+            <option value="">Select hole...</option>
+          </select>
+          <input type="file" id="photo-file-input" accept="image/*" capture="environment" style="display:none;" onchange="uploadPhoto(this)"/>
+          <button class="upload-btn" onclick="document.getElementById('photo-file-input').click()">📷 Add Photo</button>
+        </div>
+        <div id="upload-progress" style="display:none;margin-top:8px;font-size:12px;color:var(--mu);">Uploading...</div>
+      </div>
+      <div id="photo-gallery"></div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
   <div id="tab-history" style="display:none;">
     <div class="histwrap">
       <div class="series-banner">
@@ -370,14 +445,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
   </div>
 
+  <!-- RECAP -->
   <div id="tab-recap" style="display:none;">
     <div class="recapwrap" id="recap-content"></div>
   </div>
 
+  <!-- SETUP -->
   <div id="tab-setup" style="display:none;">
     <div class="setupwrap">
-
-      <!-- Course Setup -->
       <div class="stitle">Course Setup</div>
       <div class="course-card">
         <div class="course-name-row">
@@ -391,6 +466,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <button class="course-save-btn" onclick="saveCourseSettings()">💾 Save Course Settings</button>
       </div>
 
+      <div class="stitle">Custom Prizes</div>
+      <div class="prize-card">
+        <p style="font-size:12px;color:var(--mu);margin-bottom:12px;">Enter the actual stakes for this year's round. One prize is picked randomly at reveal.</p>
+        <div id="prize-inputs"></div>
+        <button class="prize-save-btn" onclick="savePrizes()">💾 Save Prizes</button>
+      </div>
+
       <div class="stitle">Teams &amp; Players</div>
       <div id="t1card" class="team-card" style="border:1px solid rgba(22,163,74,.25);"></div>
       <div id="t2card" class="team-card" style="border:1px solid rgba(220,38,38,.25);"></div>
@@ -400,12 +482,25 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div class="stitle">Game Controls</div>
       <button class="clear-btn" onclick="confirmClear('round')">🔄 Clear Scores — Start New Round</button>
       <button class="clear-btn danger" onclick="confirmClear('all')" style="margin-top:8px;">🗑️ End Game — Clear Everything</button>
-      <div style="font-size:11px;color:var(--mu);margin-top:8px;line-height:1.6;">
-        <strong>New Round</strong> clears scores and side bets only. Team names, players, course, and history stay.<br/>
-        <strong>End Game</strong> clears scores, side bets, and trash talk. History is preserved.
-      </div>
+      <div style="font-size:11px;color:var(--mu);margin-top:8px;line-height:1.6;"><strong>New Round</strong> clears scores and side bets only.<br/><strong>End Game</strong> also clears trash talk and photos.</div>
       <div class="ibox g">💡 Scores save instantly. Other phones update every 15s or tap ⟳.</div>
     </div>
+  </div>
+</div>
+
+<!-- PRIZE MODAL -->
+<div class="moverlay hidden" id="prize-overlay">
+  <div class="pmodal">
+    <span class="ptrophy" id="ptrophy">🏆</span>
+    <div class="pwlbl">Winner of the Koppy Kup Classic</div>
+    <div class="pwname" id="pwname">—</div>
+    <div class="pwscore" id="pwscore"></div>
+    <div class="scratch-area" id="scratch-area">
+      <div class="srev"><span class="srev-text" id="prize-text">🍺 First Round's on the Losers!</span><span class="srev-sub" id="prize-sub">Collect at the 19th hole</span></div>
+      <canvas id="scratch-canvas"></canvas>
+    </div>
+    <div class="shint" id="shint">👆 SCRATCH TO REVEAL YOUR PRIZE</div>
+    <button class="pclose" onclick="closePrize()">Close</button>
   </div>
 </div>
 
@@ -422,19 +517,24 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   </div>
 </div>
 
-<div class="moverlay hidden" id="prize-overlay">
-  <div class="pmodal">
-    <span class="ptrophy" id="ptrophy">🏆</span>
-    <div class="pwlbl">Winner of the Koppy Kup Classic</div>
-    <div class="pwname" id="pwname">—</div>
-    <div class="pwscore" id="pwscore"></div>
-    <div class="scratch-area" id="scratch-area">
-      <div class="srev"><span class="srev-text" id="prize-text">🍺 First Round's on the Losers!</span><span class="srev-sub" id="prize-sub">Collect at the 19th hole</span></div>
-      <canvas id="scratch-canvas"></canvas>
+<!-- NOTE MODAL -->
+<div class="moverlay hidden" id="note-overlay">
+  <div class="note-modal">
+    <h3 id="note-modal-title">📝 Hole Note</h3>
+    <textarea class="note-textarea" id="note-input" placeholder="e.g. Randy sank a 40-foot putt. Closest pin: 3 feet."></textarea>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:10px;" id="note-author-display"></div>
+    <div class="note-btns">
+      <button class="note-cancel" onclick="closeNote()">Cancel</button>
+      <button class="note-del" id="note-del-btn" onclick="deleteNote()" style="display:none;">Delete</button>
+      <button class="note-save" onclick="saveNote()">Save</button>
     </div>
-    <div class="shint" id="shint">👆 SCRATCH TO REVEAL YOUR PRIZE</div>
-    <button class="pclose" onclick="closePrize()">Close</button>
   </div>
+</div>
+
+<!-- PHOTO LIGHTBOX -->
+<div class="lightbox hidden" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt=""/>
 </div>
 
 <div class="confwrap" id="confwrap"></div>
@@ -445,19 +545,18 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 const SUPABASE_URL='https://zfgsnwnsokijeugpelfh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpmZ3Nud25zb2tpamV1Z3BlbGZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NTkyNjksImV4cCI6MjA5NTUzNTI2OX0.Y_0xkih5wMxOKsp9tD5zBCJuQ55yQWI-wyYutlA0enw';
 
-// Default par — overwritten by course settings from DB
 let PAR=[4,4,3,4,5,3,4,5,4,4,3,5,4,4,3,5,4,4];
 let courseName='';
-
-function TPAR(){return PAR.reduce((a,b)=>a+b,0);}
-function FPAR(){return PAR.slice(0,9).reduce((a,b)=>a+b,0);}
-function BPAR(){return PAR.slice(9).reduce((a,b)=>a+b,0);}
+const TPAR=()=>PAR.reduce((a,b)=>a+b,0);
+const FPAR=()=>PAR.slice(0,9).reduce((a,b)=>a+b,0);
+const BPAR=()=>PAR.slice(9).reduce((a,b)=>a+b,0);
 
 const TEAMS={
   team1:{color:'#16a34a',emoji:'🦅',dn:'Team 1'},
   team2:{color:'#dc2626',emoji:'🔥',dn:'Team 2'},
 };
-const PRIZES=[
+
+let DEFAULT_PRIZES=[
   {text:"🍺 First Round's on the Losers!",sub:"Collect at the 19th hole"},
   {text:"💵 Winner Takes the Pot!",sub:"Hand it over, gentlemen"},
   {text:"🎖️ Eternal Bragging Rights",sub:"Never. Let. Them. Forget."},
@@ -465,17 +564,21 @@ const PRIZES=[
   {text:"👑 Champions Park First All Day",sub:"Best spot at every tee box — always"},
   {text:"🏌️ Losers Carry the Bags Next Round",sub:"Get to work, caddies"},
 ];
+let PRIZES=[...DEFAULT_PRIZES];
+
 const EMOJIS=['🔥','💀','🤣','😤','🏌️','⛳','💩','👏','🫡','🍺'];
 
 let sb=null;
 let scores={team1:{},team2:{}};
 let names={team1:'Team 1',team2:'Team 2'};
 let players={team1:['','','',''],team2:['','','','']};
-let trashMsgs=[],sideBets={},histYears=[];
+let trashMsgs=[],sideBets={},histYears=[],photos=[],holeNotes={};
 let myTeam=localStorage.getItem('kk_myteam')||null;
 let ttSender=localStorage.getItem('kk_ttsender')||null;
 let editingCell=null,scratchDone=false;
+let pendingClearType=null,pendingNoteHole=null;
 
+// ── CONFIG ──
 function saveConfig(){
   const u=document.getElementById('cu').value.trim(),k=document.getElementById('ck').value.trim();
   if(!u||!k){showToast('Enter both values','e');return;}
@@ -487,24 +590,30 @@ function getCfg(){
   return{u,k};
 }
 
+// ── INIT ──
 async function init(){
   const{u,k}=getCfg();
   if(!u||!k){document.getElementById('loading').style.display='none';document.getElementById('cfg-screen').style.display='block';return;}
   sb=supabase.createClient(u,k);
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='block';
+  buildPhotoHoleSel();
   await loadAll();
   renderTeamPicker();
   buildParInputs();
+  buildPrizeInputs();
   setInterval(loadAll,15000);
   sb.channel('kk')
     .on('postgres_changes',{event:'*',schema:'public',table:'scores'},()=>loadAll())
     .on('postgres_changes',{event:'*',schema:'public',table:'settings'},()=>loadAll())
     .on('postgres_changes',{event:'*',schema:'public',table:'trash'},()=>loadTrash())
     .on('postgres_changes',{event:'*',schema:'public',table:'sidebets'},()=>loadSideBets())
+    .on('postgres_changes',{event:'*',schema:'public',table:'photos'},()=>loadPhotos())
+    .on('postgres_changes',{event:'*',schema:'public',table:'hole_notes'},()=>loadNotes())
     .subscribe();
 }
 
+// ── LOAD ALL ──
 async function loadAll(){
   try{
     const[{data:sd},{data:st},{data:hy}]=await Promise.all([
@@ -520,6 +629,7 @@ async function loadAll(){
       if(r.key==='team2_players')try{players.team2=JSON.parse(r.value);}catch{}
       if(r.key==='course_name')courseName=r.value;
       if(r.key==='course_par')try{const p=JSON.parse(r.value);if(Array.isArray(p)&&p.length===18)PAR=p;}catch{}
+      if(r.key==='custom_prizes')try{const cp=JSON.parse(r.value);if(Array.isArray(cp)&&cp.length)PRIZES=cp;}catch{}
     });}
     if(hy)histYears=hy;
     document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
@@ -527,6 +637,8 @@ async function loadAll(){
     renderAll();
     await loadTrash();
     await loadSideBets();
+    await loadPhotos();
+    await loadNotes();
   }catch(e){document.getElementById('sync-time').textContent='Sync error';}
 }
 
@@ -536,72 +648,31 @@ async function loadTrash(){
 async function loadSideBets(){
   try{const{data}=await sb.from('sidebets').select('*');if(data){sideBets={};data.forEach(r=>{sideBets[r.hole]={ctpin:r.ctpin,ldrive:r.ldrive};});}renderSideBets();}catch{}
 }
+async function loadPhotos(){
+  try{const{data}=await sb.from('photos').select('*').order('created_at',{ascending:true});if(data)photos=data;renderPhotos();}catch{}
+}
+async function loadNotes(){
+  try{const{data}=await sb.from('hole_notes').select('*');if(data){holeNotes={};data.forEach(r=>{holeNotes[r.hole]={note:r.note,author:r.author};});}renderNoteRow();}catch{}
+}
+
 async function upsertScore(tid,hole,val){
   await sb.from('scores').upsert({team_id:tid,hole,score:val},{onConflict:'team_id,hole'});
   document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
 }
 async function saveSetting(key,value){await sb.from('settings').upsert({key,value},{onConflict:'key'});}
 
-// ── COURSE SETUP ──
-function buildParInputs(){
-  const front=document.getElementById('par-grid-front');
-  const back=document.getElementById('par-grid-back');
-  if(!front||!back)return;
-  front.innerHTML=Array.from({length:9},(_,i)=>`
-    <div class="par-cell">
-      <span class="par-hole-lbl">${i+1}</span>
-      <input class="par-input" id="par-${i}" type="number" min="3" max="6" value="${PAR[i]}" oninput="updateParTotals()"/>
-    </div>`).join('');
-  back.innerHTML=Array.from({length:9},(_,i)=>`
-    <div class="par-cell">
-      <span class="par-hole-lbl">${i+10}</span>
-      <input class="par-input" id="par-${i+9}" type="number" min="3" max="6" value="${PAR[i+9]}" oninput="updateParTotals()"/>
-    </div>`).join('');
-  // Set course name input
-  const cn=document.getElementById('course-name-input');
-  if(cn)cn.value=courseName||'';
-  updateParTotals();
-}
-
-function updateParTotals(){
-  const vals=Array.from({length:18},(_,i)=>{
-    const inp=document.getElementById('par-'+i);
-    return inp?parseInt(inp.value)||4:PAR[i];
-  });
-  const f=vals.slice(0,9).reduce((a,b)=>a+b,0);
-  const b=vals.slice(9).reduce((a,b)=>a+b,0);
-  const el=document.getElementById('par-totals');
-  if(el)el.innerHTML=`<span class="par-total-chip">Front: ${f}</span><span class="par-total-chip">Back: ${b}</span><span class="par-total-chip">Total: ${f+b}</span>`;
-}
-
-async function saveCourseSettings(){
-  const cn=document.getElementById('course-name-input')?.value?.trim()||'';
-  const newPar=Array.from({length:18},(_,i)=>{
-    const inp=document.getElementById('par-'+i);
-    return inp?parseInt(inp.value)||4:PAR[i];
-  });
-  courseName=cn;PAR=newPar;
-  document.getElementById('hdr-course').textContent=cn?`📍 ${cn}`:'';
-  await Promise.all([
-    saveSetting('course_name',cn),
-    saveSetting('course_par',JSON.stringify(newPar)),
-  ]);
-  showToast('Course saved ✓');
-  buildTable();renderAll();
-}
-
 // ── TABLE ──
 function buildTable(){
-  const hr=document.getElementById('hhr');
-  if(!hr)return;
+  const hr=document.getElementById('hhr');if(!hr)return;
   hr.innerHTML='<td style="padding:5px 8px;min-width:86px;"></td>';
   PAR.forEach((p,h)=>hr.innerHTML+=`<td style="min-width:40px;"><div class="hnum">${h+1}</div><div class="hpar">p${p}</div></td>`);
   hr.innerHTML+=`<td style="min-width:36px;text-align:center;font-size:10px;color:#9ca3af;">F9</td><td style="min-width:36px;text-align:center;font-size:10px;color:#9ca3af;">B9</td><td style="min-width:42px;text-align:center;font-size:10px;color:#9ca3af;">TOT</td><td style="min-width:40px;text-align:center;font-size:10px;color:#9ca3af;">+/-</td>`;
 }
 
+// ── RENDER ALL ──
 function renderAll(){
   buildTable();
-  renderTeamRows();renderWinnerRow();renderBanner();
+  renderTeamRows();renderWinnerRow();renderNoteRow();renderBanner();
   renderSetup();renderTeamPicker();
   renderMomentum();renderSideBets();
   renderHistory();renderRecap();
@@ -613,7 +684,7 @@ function scClass(s,par){
 }
 function plHtml(tid){
   const pp=players[tid].filter(p=>p.trim());
-  return pp.length?`<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;">${pp.join(' · ')}</div>`:'';
+  return pp.length?`<div style="font-size:10px;color:rgba(0,0,0,.35);margin-top:2px;">${pp.join(' · ')}</div>`:'';
 }
 
 function renderTeamRows(){
@@ -626,11 +697,11 @@ function renderTeamRows(){
       h+=`<td style="padding:2px 1px;text-align:center;position:relative;">${mk}<div class="sc ${cls}" data-team="${tid}" data-hole="${hole}" onclick="cellClick(this)">${s||'·'}</div></td>`;
     });
     const f=front(tid),b=back(tid),tot=total(tid),{diff,count}=toPar(tid);
-    const ps=count>0?(diff===0?'E':diff>0?`+${diff}`:diff):'—',pc=diff<0?'#4ade80':diff>0?'#f87171':'#9ca3af';
+    const ps=count>0?(diff===0?'E':diff>0?`+${diff}`:diff):'—',pc=diff<0?'#16a34a':diff>0?'#dc2626':'#6b7280';
     h+=`<td class="sumc">${f||'—'}</td><td class="sumc">${b||'—'}</td><td class="totc">${tot||'—'}</td><td class="pdc" style="color:${pc}">${ps}</td>`;
     row.innerHTML=h;
     if(tid==='team1'){
-      let ph='<td style="padding:5px 8px;font-size:11px;color:#4ade80;font-weight:700;">Par</td>';
+      let ph='<td style="padding:5px 8px;font-size:11px;color:#15803d;font-weight:700;">Par</td>';
       PAR.forEach(p=>ph+=`<td class="pval">${p}</td>`);
       ph+=`<td class="pval">${FPAR()}</td><td class="pval">${BPAR()}</td><td class="pval">${TPAR()}</td><td></td>`;
       document.getElementById('parrow').innerHTML=ph;
@@ -640,11 +711,22 @@ function renderTeamRows(){
 
 function renderWinnerRow(){
   const row=document.getElementById('wrow');
-  let h='<td style="padding:3px 8px;font-size:10px;color:#6b7280;">Winner</td>';
+  let h='<td style="padding:3px 8px;font-size:10px;color:var(--mu);">Winner</td>';
   PAR.forEach((_,hole)=>{
     const w=holeWinner(hole);
     h+=w&&w!=='tie'?`<td class="wcell"><span style="color:${TEAMS[w].color}">${TEAMS[w].emoji}</span></td>`:
        w==='tie'?'<td class="wcell"><span style="color:#6b7280">–</span></td>':'<td class="wcell"></td>';
+  });
+  h+='<td colspan="4"></td>';
+  row.innerHTML=h;
+}
+
+function renderNoteRow(){
+  const row=document.getElementById('noterow');if(!row)return;
+  let h='<td style="padding:2px 8px;font-size:10px;color:var(--mu);">📝</td>';
+  PAR.forEach((_,hole)=>{
+    const hasNote=!!holeNotes[hole];
+    h+=`<td class="notecell"><span class="note-dot ${hasNote?'has-note':''}" onclick="openNote(${hole})" title="${hasNote?holeNotes[hole].note:'Add note'}">${hasNote?'📝':'·'}</span></td>`;
   });
   h+='<td colspan="4"></td>';
   row.innerHTML=h;
@@ -657,7 +739,7 @@ function renderBanner(){
     const tot=total(tid);
     document.getElementById(`bt${n}s`).textContent=tot||'—';
     const{diff,count}=toPar(tid),el=document.getElementById(`bt${n}p`);
-    if(count>0){el.textContent=diff===0?'Even':diff>0?`+${diff}`:`${diff}`;el.style.color=diff<0?'#4ade80':diff>0?'#f87171':'#9ca3af';}
+    if(count>0){el.textContent=diff===0?'Even':diff>0?`+${diff}`:`${diff}`;el.style.color=diff<0?'#16a34a':diff>0?'#dc2626':'#6b7280';}
     else{el.textContent='—';el.style.color='#6b7280';}
   });
   const mt=matchTally();
@@ -669,7 +751,7 @@ function renderTeamPicker(){
   if(myTeam){
     document.getElementById('tpick').style.display='none';
     document.getElementById('atbar').style.display='flex';
-    document.getElementById('atlbl').textContent=myTeam==='watch'?'👀 Spectating':`Scoring for: ${TEAMS[myTeam].emoji} ${names[myTeam]}`;
+    document.getElementById('atlbl').textContent=myTeam==='watch'?'👀 Spectating':`Scoring for: ${TEAMS[myTeam]?.emoji||''} ${names[myTeam]||myTeam}`;
   }else{
     document.getElementById('tpick').style.display='block';
     document.getElementById('atbar').style.display='none';
@@ -678,20 +760,114 @@ function renderTeamPicker(){
   document.getElementById('pk2').textContent=`🔥 ${names.team2}`;
 }
 
+// ── NOTES ──
+function openNote(hole){
+  pendingNoteHole=hole;
+  const existing=holeNotes[hole];
+  document.getElementById('note-modal-title').textContent=`📝 Hole ${hole+1} Note`;
+  document.getElementById('note-input').value=existing?existing.note:'';
+  document.getElementById('note-author-display').textContent=existing?`Last edited by ${existing.author||'unknown'}`:'';
+  document.getElementById('note-del-btn').style.display=existing?'block':'none';
+  document.getElementById('note-overlay').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('note-input').focus(),100);
+}
+function closeNote(){document.getElementById('note-overlay').classList.add('hidden');pendingNoteHole=null;}
+async function saveNote(){
+  const note=document.getElementById('note-input').value.trim();
+  if(!note){await deleteNote();return;}
+  const author=ttSender||(myTeam&&myTeam!=='watch'?names[myTeam]:'Someone');
+  await sb.from('hole_notes').upsert({hole:pendingNoteHole,note,author},{onConflict:'hole'});
+  holeNotes[pendingNoteHole]={note,author};
+  closeNote();renderNoteRow();showToast('Note saved ✓');
+}
+async function deleteNote(){
+  if(pendingNoteHole===null)return;
+  await sb.from('hole_notes').delete().eq('hole',pendingNoteHole);
+  delete holeNotes[pendingNoteHole];
+  closeNote();renderNoteRow();showToast('Note deleted');
+}
+
+// ── PHOTOS ──
+function buildPhotoHoleSel(){
+  const sel=document.getElementById('photo-hole-sel');
+  sel.innerHTML='<option value="">Select hole...</option>';
+  for(let h=1;h<=18;h++)sel.innerHTML+=`<option value="${h-1}">Hole ${h}</option>`;
+}
+
+async function uploadPhoto(input){
+  const file=input.files[0];if(!file)return;
+  const holeVal=document.getElementById('photo-hole-sel').value;
+  if(holeVal===''){showToast('Select a hole first','e');input.value='';return;}
+  const hole=parseInt(holeVal);
+  const prog=document.getElementById('upload-progress');
+  prog.style.display='block';prog.textContent='Uploading...';
+  try{
+    const ext=file.name.split('.').pop()||'jpg';
+    const path=`hole-${hole}/${Date.now()}.${ext}`;
+    const{error:upErr}=await sb.storage.from('hole-photos').upload(path,file,{cacheControl:'3600',upsert:false});
+    if(upErr)throw upErr;
+    const{data:urlData}=sb.storage.from('hole-photos').getPublicUrl(path);
+    const uploader=ttSender||(myTeam&&myTeam!=='watch'?names[myTeam]:'Unknown');
+    await sb.from('photos').insert({hole,team_id:myTeam&&myTeam!=='watch'?myTeam:null,uploader_name:uploader,url:urlData.publicUrl});
+    prog.style.display='none';
+    input.value='';
+    showToast('Photo uploaded ✓');
+    await loadPhotos();
+  }catch(e){prog.style.display='none';input.value='';showToast('Upload failed: '+e.message,'e');}
+}
+
+function renderPhotos(){
+  const gallery=document.getElementById('photo-gallery');if(!gallery)return;
+  if(!photos.length){gallery.innerHTML='<div class="no-photos">📸 No photos yet.<br/>Be the first to add one!</div>';return;}
+  const byHole={};
+  photos.forEach(p=>{if(!byHole[p.hole])byHole[p.hole]=[];byHole[p.hole].push(p);});
+  gallery.innerHTML=Object.keys(byHole).sort((a,b)=>a-b).map(h=>{
+    const hphotos=byHole[h];
+    return`<div class="photo-hole-group" style="grid-column:span 2;">
+      <div class="photo-hole-hdr">⛳ Hole ${parseInt(h)+1}</div>
+      <div class="photo-grid">
+        ${hphotos.map(p=>`
+          <div class="photo-thumb">
+            <img src="${p.url}" onclick="openLightbox('${p.url}')" loading="lazy"/>
+            <div class="photo-thumb-lbl">${p.uploader_name||''}</div>
+            <button class="photo-del" onclick="deletePhoto('${p.id}','${p.url}')" title="Delete">✕</button>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function deletePhoto(id,url){
+  try{
+    const path=url.split('/hole-photos/')[1];
+    if(path)await sb.storage.from('hole-photos').remove([path]);
+    await sb.from('photos').delete().eq('id',id);
+    photos=photos.filter(p=>p.id!==id);
+    renderPhotos();showToast('Photo deleted');
+  }catch(e){showToast('Error deleting photo','e');}
+}
+
+function openLightbox(url){
+  document.getElementById('lightbox-img').src=url;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox(){document.getElementById('lightbox').classList.add('hidden');}
+
 // ── MOMENTUM ──
 function renderMomentum(){
   const last3=momentumFor(3),last6=momentumFor(6),last9=momentumFor(9);
   document.getElementById('mom-grid').innerHTML=[['Last 3',last3],['Last 6',last6],['Last 9',last9]].map(([lbl,m])=>{
-    if(!m)return`<div class="mom-card"><div class="mom-label">${lbl} HOLES</div><div class="mom-val" style="color:#6b7280">—</div><div class="mom-sub">No data</div></div>`;
-    const c=m.winner==='team1'?'#4ade80':m.winner==='team2'?'#f87171':'#9ca3af';
+    if(!m)return`<div class="mom-card"><div class="mom-label">${lbl} HOLES</div><div class="mom-val" style="color:var(--mu)">—</div><div class="mom-sub">No data</div></div>`;
+    const c=m.winner==='team1'?'#16a34a':m.winner==='team2'?'#dc2626':'#6b7280';
     const nm=m.winner&&m.winner!=='tie'?`${TEAMS[m.winner].emoji} ${names[m.winner]}`:'Tied';
-    return`<div class="mom-card"><div class="mom-label">${lbl} HOLES</div><div class="mom-val" style="color:${c};font-size:16px;">${nm}</div><div class="mom-sub">${m.t1}–${m.t2} holes</div></div>`;
+    return`<div class="mom-card"><div class="mom-label">${lbl} HOLES</div><div class="mom-val" style="color:${c};font-size:15px;">${nm}</div><div class="mom-sub">${m.t1}–${m.t2} holes</div></div>`;
   }).join('');
   document.getElementById('hole-strip').innerHTML=PAR.map((_,h)=>{
     const w=holeWinner(h);
-    const bg=w==='team1'?'rgba(22,163,74,.35)':w==='team2'?'rgba(220,38,38,.35)':w==='tie'?'rgba(255,255,255,.08)':'rgba(255,255,255,.04)';
-    const bc=w==='team1'?'#16a34a':w==='team2'?'#dc2626':w==='tie'?'#6b7280':'transparent';
-    return`<div class="hs" style="background:${bg};border:1px solid ${bc};color:${bc==='transparent'?'#4b5563':'#fff'}">${h+1}</div>`;
+    const bg=w==='team1'?'rgba(22,163,74,.2)':w==='team2'?'rgba(220,38,38,.2)':w==='tie'?'rgba(0,0,0,.08)':'rgba(0,0,0,.04)';
+    const bc=w==='team1'?'#16a34a':w==='team2'?'#dc2626':w==='tie'?'#94a3b8':'#e2e8f0';
+    const col=w&&w!=='tie'?(w==='team1'?'#15803d':'#dc2626'):'#94a3b8';
+    return`<div class="hs" style="background:${bg};border:1px solid ${bc};color:${col}">${h+1}</div>`;
   }).join('');
   drawSwingChart();
 }
@@ -711,22 +887,22 @@ function drawSwingChart(){
   ctx.clearRect(0,0,W,H);
   const points=[];let lead=0;
   for(let h=0;h<18;h++){const w=holeWinner(h);if(w==='team1')lead++;else if(w==='team2')lead--;if(scores.team1?.[h]||scores.team2?.[h])points.push({h,lead});}
-  if(points.length<2){ctx.fillStyle='rgba(255,255,255,.1)';ctx.font='12px Source Sans 3,sans-serif';ctx.textAlign='center';ctx.fillText('Play more holes to see the swing chart',W/2,H/2);return;}
+  if(points.length<2){ctx.fillStyle='#94a3b8';ctx.font='12px Source Sans 3,sans-serif';ctx.textAlign='center';ctx.fillText('Play more holes to see the swing chart',W/2,H/2);return;}
   const maxL=Math.max(3,...points.map(p=>Math.abs(p.lead)));
   const pad=16,xS=(W-pad*2)/17,yM=H/2,yS=(H/2-20)/maxL;
-  ctx.strokeStyle='rgba(255,255,255,.1)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;ctx.setLineDash([3,3]);
   ctx.beginPath();ctx.moveTo(pad,yM);ctx.lineTo(W-pad,yM);ctx.stroke();ctx.setLineDash([]);
   ctx.beginPath();ctx.moveTo(pad+points[0].h*xS,yM);
   points.forEach(p=>ctx.lineTo(pad+p.h*xS,yM-p.lead*yS));
   ctx.lineTo(pad+points[points.length-1].h*xS,yM);ctx.closePath();
   const grad=ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,'rgba(22,163,74,.3)');grad.addColorStop(.5,'rgba(255,255,255,.05)');grad.addColorStop(1,'rgba(220,38,38,.3)');
+  grad.addColorStop(0,'rgba(22,163,74,.2)');grad.addColorStop(.5,'rgba(0,0,0,.03)');grad.addColorStop(1,'rgba(220,38,38,.2)');
   ctx.fillStyle=grad;ctx.fill();
-  ctx.beginPath();ctx.strokeStyle='rgba(74,222,128,.7)';ctx.lineWidth=2;ctx.lineJoin='round';
+  ctx.beginPath();ctx.strokeStyle='#16a34a';ctx.lineWidth=2;ctx.lineJoin='round';
   points.forEach((p,i)=>i===0?ctx.moveTo(pad+p.h*xS,yM-p.lead*yS):ctx.lineTo(pad+p.h*xS,yM-p.lead*yS));
   ctx.stroke();
   const last=points[points.length-1];
-  ctx.fillStyle=last.lead>0?'#4ade80':last.lead<0?'#f87171':'#9ca3af';
+  ctx.fillStyle=last.lead>0?'#15803d':last.lead<0?'#dc2626':'#64748b';
   ctx.font='bold 11px Source Sans 3,sans-serif';ctx.textAlign='right';
   ctx.fillText(last.lead>0?`${TEAMS.team1.emoji} Leading`:last.lead<0?`${TEAMS.team2.emoji} Leading`:'Tied',W-pad,yM-last.lead*yS-6);
 }
@@ -734,21 +910,19 @@ function drawSwingChart(){
 // ── TRASH ──
 function renderTrash(){
   const feed=document.getElementById('ttfeed');
-  // Always render sender selector regardless of message count
   const all=[...players.team1,...players.team2].filter(p=>p);
   const tssel=document.getElementById('tt-sender-sel');
   if(all.length){
     tssel.innerHTML=all.map(name=>{
       const tid=players.team1.includes(name)?'team1':'team2';
       const t=TEAMS[tid],sel=ttSender===name;
-      return`<button class="tt-sel-btn" style="${sel?`background:${t.color}30;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${name}','${tid}')">${t.emoji} ${name}</button>`;
+      return`<button class="tt-sel-btn" style="${sel?`background:${t.color}20;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${name}','${tid}')">${t.emoji} ${name}</button>`;
     }).join('');
   }else{
-    // No player names set — show team buttons as fallback
     tssel.innerHTML=`<div style="font-size:10px;color:var(--mu);width:100%;margin-bottom:4px;">Sending as:</div>`+
       Object.entries(TEAMS).map(([tid,t])=>{
         const sel=ttSender===tid;
-        return`<button class="tt-sel-btn" style="${sel?`background:${t.color}30;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${tid}','${tid}')">${t.emoji} ${names[tid]}</button>`;
+        return`<button class="tt-sel-btn" style="${sel?`background:${t.color}20;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${tid}','${tid}')">${t.emoji} ${names[tid]}</button>`;
       }).join('');
   }
   if(!trashMsgs.length){feed.innerHTML='<div class="empty-feed">🤫 No trash talk yet.<br/>Someone start something.</div>';return;}
@@ -756,7 +930,7 @@ function renderTrash(){
     const t=TEAMS[m.team_id]||{color:'#9ca3af',emoji:'💬'};
     const ts=new Date(m.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     const reactions=m.reactions?JSON.parse(m.reactions):{};
-    return`<div class="ttmsg" style="border-color:${t.color}40">
+    return`<div class="ttmsg" style="border-color:${t.color}">
       <div class="ttmsg-header"><span class="ttmsg-author" style="color:${t.color}">${t.emoji} ${m.sender_name}</span><span class="ttmsg-time">${ts}</span></div>
       <div class="ttmsg-text">${escHtml(m.message)}</div>
       <div class="ttmsg-reactions">${EMOJIS.map(e=>{const c=reactions[e]||0;return`<button class="react-btn ${c>0?'reacted':''}" onclick="reactMsg('${m.id}','${e}')">${e}${c>0?` ${c}`:''}</button>`;}).join('')}</div>
@@ -770,7 +944,6 @@ async function sendTrash(){
   const inp=document.getElementById('ttinput'),msg=inp.value.trim();
   if(!msg)return;
   if(!ttSender){showToast('Pick your team above first','e');return;}
-  // Determine team: if ttSender is a team id use it directly, else look up by player name
   const tid=TEAMS[ttSender]?ttSender:(players.team1.includes(ttSender)?'team1':'team2');
   const displayName=TEAMS[ttSender]?names[ttSender]:ttSender;
   inp.value='';
@@ -792,8 +965,7 @@ function renderSideBets(){
   wrap.innerHTML=PAR.map((par,h)=>{
     const sb2=sideBets[h]||{},ctpin=sb2.ctpin,ldrive=sb2.ldrive;
     const wbtn=(field,curVal,tid)=>{
-      const sel=curVal===tid;
-      const cls=sel?(tid==='team1'?'sel1':'sel2'):'';
+      const sel=curVal===tid,cls=sel?(tid==='team1'?'sel1':'sel2'):'';
       return`<button class="sb-wbtn ${cls}" onclick="setSideBet(${h},'${field}','${tid}')">${TEAMS[tid].emoji} ${names[tid]}</button>`;
     };
     return`<div class="sb-hole-card">
@@ -831,15 +1003,15 @@ function renderHistory(){
         <div class="hist-team-score" style="border:1px solid ${TEAMS.team1.color}30">
           <div class="hist-tn" style="color:${TEAMS.team1.color}">${TEAMS.team1.emoji} ${names.team1}</div>
           <div class="hist-sc">${y.score1||'—'}</div>
-          <div class="hist-par" style="color:${d1<0?'#4ade80':d1>0?'#f87171':'#9ca3af'}">${y.par1?`${fmtD(d1)} · par ${y.par1}`:'—'}</div>
+          <div class="hist-par" style="color:${d1<0?'#16a34a':d1>0?'#dc2626':'#6b7280'}">${y.par1?`${fmtD(d1)} · par ${y.par1}`:'—'}</div>
         </div>
         <div class="hist-team-score" style="border:1px solid ${TEAMS.team2.color}30">
           <div class="hist-tn" style="color:${TEAMS.team2.color}">${TEAMS.team2.emoji} ${names.team2}</div>
           <div class="hist-sc">${y.score2||'—'}</div>
-          <div class="hist-par" style="color:${d2<0?'#4ade80':d2>0?'#f87171':'#9ca3af'}">${y.par2?`${fmtD(d2)} · par ${y.par2}`:'—'}</div>
+          <div class="hist-par" style="color:${d2<0?'#16a34a':d2>0?'#dc2626':'#6b7280'}">${y.par2?`${fmtD(d2)} · par ${y.par2}`:'—'}</div>
         </div>
       </div>
-      ${y.notes?`<div style="font-size:12px;color:var(--mu);font-style:italic;">"${escHtml(y.notes)}"</div>`:''}
+      ${y.notes?`<div style="font-size:12px;color:var(--mu);font-style:italic;margin-top:4px;">"${escHtml(y.notes)}"</div>`:''}
     </div>`;
   }).join('');
 }
@@ -859,7 +1031,6 @@ function showHistForm(){
     </div>
   </div>`;
 }
-
 async function saveHistYear(){
   const year=parseInt(document.getElementById('hf-year').value);
   const course=document.getElementById('hf-course').value.trim();
@@ -894,18 +1065,19 @@ function renderRecap(){
   for(let h=0;h<18;h++){const s1=scores.team1?.[h],s2=scores.team2?.[h];if(s1&&s2){const d=Math.abs(s1-s2);if(d<battleDiff){battleDiff=d;battleHole=h;}}}
   let sb1ctp=0,sb2ctp=0,sb1ld=0,sb2ld=0;
   Object.values(sideBets).forEach(sb=>{if(sb.ctpin==='team1')sb1ctp++;else if(sb.ctpin==='team2')sb2ctp++;if(sb.ldrive==='team1')sb1ld++;else if(sb.ldrive==='team2')sb2ld++;});
+  const noteCount=Object.keys(holeNotes).length;
   const fmtD=d=>(d===0?'E':d>0?`+${d}`:d);
   wrap.innerHTML=`<div class="recap-card">
     <div class="recap-title">🏆 Koppy Kup Classic</div>
     <div class="recap-sub">${courseName?`📍 ${courseName} · `:''}${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})} · ${holesPlayed}/18 holes</div>
-    ${winner&&winner!=='tie'?`<div class="recap-winner-box" style="border-color:${wt.color}50"><span class="recap-trophy">🏆</span><div class="recap-winner-lbl">Champion</div><div class="recap-winner-name" style="color:${wt.color}">${wt.emoji} ${names[winner]}</div></div>`:winner==='tie'?`<div class="recap-winner-box"><span class="recap-trophy">🤝</span><div class="recap-winner-name" style="color:#f59e0b">Dead Heat!</div></div>`:''}
+    ${winner&&winner!=='tie'?`<div class="recap-winner-box" style="border-color:${wt.color}50"><span class="recap-trophy">🏆</span><div class="recap-winner-lbl">Champion</div><div class="recap-winner-name" style="color:${wt.color}">${wt.emoji} ${names[winner]}</div></div>`:winner==='tie'?`<div class="recap-winner-box"><span class="recap-trophy">🤝</span><div class="recap-winner-name" style="color:#d97706">Dead Heat!</div></div>`:''}
     <div class="recap-stats">
       <div class="rstat"><div class="rstat-val" style="color:${TEAMS.team1.color}">${t1tot||'—'}</div><div class="rstat-lbl">${names.team1} Total</div></div>
       <div class="rstat"><div class="rstat-val" style="color:${TEAMS.team2.color}">${t2tot||'—'}</div><div class="rstat-lbl">${names.team2} Total</div></div>
       <div class="rstat"><div class="rstat-val">${mt.t1}</div><div class="rstat-lbl">${names.team1} Holes Won</div></div>
       <div class="rstat"><div class="rstat-val">${mt.t2}</div><div class="rstat-lbl">${names.team2} Holes Won</div></div>
-      <div class="rstat"><div class="rstat-val" style="color:${d1<0?'#4ade80':d1>0?'#f87171':'#9ca3af'}">${t1tot?fmtD(d1):'—'}</div><div class="rstat-lbl">${names.team1} vs Par</div></div>
-      <div class="rstat"><div class="rstat-val" style="color:${d2<0?'#4ade80':d2>0?'#f87171':'#9ca3af'}">${t2tot?fmtD(d2):'—'}</div><div class="rstat-lbl">${names.team2} vs Par</div></div>
+      <div class="rstat"><div class="rstat-val" style="color:${d1<0?'#16a34a':d1>0?'#dc2626':'#6b7280'}">${t1tot?fmtD(d1):'—'}</div><div class="rstat-lbl">${names.team1} vs Par</div></div>
+      <div class="rstat"><div class="rstat-val" style="color:${d2<0?'#16a34a':d2>0?'#dc2626':'#6b7280'}">${t2tot?fmtD(d2):'—'}</div><div class="rstat-lbl">${names.team2} vs Par</div></div>
     </div>
     <div class="recap-moments">
       ${t1best!==null?`<div class="moment-row"><span class="moment-icon">${t1best.d<=-2?'🦅':t1best.d===-1?'🐦':'⭐'}</span><div><div class="moment-text">${names.team1}'s best hole</div><div class="moment-sub">Hole ${t1best.h+1} · ${t1best.s} strokes (${fmtD(t1best.d)})</div></div></div>`:''}
@@ -913,10 +1085,166 @@ function renderRecap(){
       ${battleHole!==null?`<div class="moment-row"><span class="moment-icon">⚔️</span><div><div class="moment-text">Most contested hole</div><div class="moment-sub">Hole ${battleHole+1} · ${scores.team1[battleHole]} vs ${scores.team2[battleHole]}</div></div></div>`:''}
       ${sb1ctp+sb2ctp>0?`<div class="moment-row"><span class="moment-icon">🎯</span><div><div class="moment-text">Closest to pin</div><div class="moment-sub">${names.team1}: ${sb1ctp} · ${names.team2}: ${sb2ctp}</div></div></div>`:''}
       ${sb1ld+sb2ld>0?`<div class="moment-row"><span class="moment-icon">💪</span><div><div class="moment-text">Longest drive</div><div class="moment-sub">${names.team1}: ${sb1ld} · ${names.team2}: ${sb2ld}</div></div></div>`:''}
-      ${trashMsgs.length>0?`<div class="moment-row"><span class="moment-icon">💬</span><div><div class="moment-text">${trashMsgs.length} trash talk messages sent</div><div class="moment-sub">Some things said today cannot be unsaid</div></div></div>`:''}
+      ${photos.length>0?`<div class="moment-row"><span class="moment-icon">📸</span><div><div class="moment-text">${photos.length} hole photo${photos.length!==1?'s':''} taken</div><div class="moment-sub">Check the Photos tab for the gallery</div></div></div>`:''}
+      ${noteCount>0?`<div class="moment-row"><span class="moment-icon">📝</span><div><div class="moment-text">${noteCount} hole note${noteCount!==1?'s':''} recorded</div><div class="moment-sub">${Object.entries(holeNotes).map(([h,n])=>`Hole ${parseInt(h)+1}: ${n.note}`).join(' · ')}</div></div></div>`:''}
+      ${trashMsgs.length>0?`<div class="moment-row"><span class="moment-icon">💬</span><div><div class="moment-text">${trashMsgs.length} trash talk messages</div><div class="moment-sub">Some things said today cannot be unsaid</div></div></div>`:''}
+    </div>
+    <div class="export-btns">
+      <button class="export-btn pdf" onclick="exportPDF()">📄 Download PDF</button>
+      <button class="export-btn img" onclick="exportImage()">📸 Save as Image</button>
     </div>
     <button class="share-btn" onclick="shareRecap()">📤 Share Recap</button>
   </div>`;
+}
+
+// ── EXPORT ──
+function buildScorecardCanvas(){
+  const canvas=document.createElement('canvas');
+  const dpr=2;
+  const W=900,H=280;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+
+  // Background
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+
+  // Header
+  ctx.fillStyle='#15803d';ctx.fillRect(0,0,W,44);
+  ctx.fillStyle='#ffffff';ctx.font='bold 16px serif';ctx.textAlign='center';
+  ctx.fillText('🏆 Koppy Kup Classic',W/2,18);
+  ctx.font='11px sans-serif';
+  ctx.fillText(`${courseName||'Course TBD'} · ${new Date().toLocaleDateString()}`,W/2,34);
+
+  const cols=20;const colW=(W-120)/cols;const rowH=36;const startX=120;const startY=50;
+
+  // Column headers
+  ctx.fillStyle='#f1f5f9';ctx.fillRect(0,startY,W,rowH);
+  ctx.fillStyle='#64748b';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+  ctx.fillText('Team',8,startY+22);
+  for(let h=0;h<18;h++){
+    ctx.textAlign='center';
+    ctx.fillText(h+1,startX+h*colW+colW/2,startY+14);
+    ctx.fillStyle='#16a34a';ctx.font='9px sans-serif';
+    ctx.fillText(`p${PAR[h]}`,startX+h*colW+colW/2,startY+26);
+    ctx.fillStyle='#64748b';ctx.font='bold 10px sans-serif';
+  }
+  // F9 B9 TOT +/-
+  ['F9','B9','TOT','+/-'].forEach((lbl,i)=>{
+    ctx.fillStyle='#64748b';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+    ctx.fillText(lbl,startX+18*colW+i*colW+colW/2,startY+22);
+  });
+
+  // Par row
+  ctx.fillStyle='#dcfce7';ctx.fillRect(0,startY+rowH,W,rowH);
+  ctx.fillStyle='#15803d';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+  ctx.fillText('Par',8,startY+rowH+22);
+  PAR.forEach((p,h)=>{
+    ctx.textAlign='center';ctx.fillStyle='#15803d';ctx.font='bold 11px sans-serif';
+    ctx.fillText(p,startX+h*colW+colW/2,startY+rowH+22);
+  });
+  [FPAR(),BPAR(),TPAR(),''].forEach((v,i)=>{
+    ctx.fillText(v,startX+18*colW+i*colW+colW/2,startY+rowH+22);
+  });
+
+  // Team rows
+  ['team1','team2'].forEach((tid,ti)=>{
+    const y=startY+rowH*2+ti*rowH;
+    ctx.fillStyle=ti===0?'#f0fdf4':'#fff5f5';ctx.fillRect(0,y,W,rowH);
+    ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;ctx.strokeRect(0,y,W,rowH);
+    const t=TEAMS[tid];
+    ctx.fillStyle=t.color;ctx.font='bold 11px sans-serif';ctx.textAlign='left';
+    ctx.fillText(`${t.emoji} ${names[tid]}`,8,y+22);
+    PAR.forEach((par,h)=>{
+      const s=scores[tid]?.[h];
+      const cx=startX+h*colW+colW/2,cy=y+rowH/2;
+      if(s){
+        const d=s-par;
+        let bg=null;
+        if(d<=-2)bg='#fef08a';
+        else if(d===-1)bg='#bbf7d0';
+        else if(d===0)bg='#f1f5f9';
+        else if(d===1)bg='#fed7aa';
+        else bg='#fecaca';
+        ctx.fillStyle=bg;
+        if(d<=-1){ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);ctx.fill();}
+        else{ctx.fillRect(cx-12,cy-12,24,24);}
+        ctx.fillStyle='#111';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+        ctx.fillText(s,cx,cy+4);
+      } else {
+        ctx.fillStyle='#cbd5e1';ctx.font='12px sans-serif';ctx.textAlign='center';
+        ctx.fillText('·',cx,cy+4);
+      }
+    });
+    const f=front(tid),b=back(tid),tot=total(tid),{diff,count}=toPar(tid);
+    const ps=count>0?(diff===0?'E':diff>0?`+${diff}`:diff):'—';
+    [f||'—',b||'—',tot||'—',ps].forEach((v,i)=>{
+      ctx.fillStyle=i===3?(diff<0?'#16a34a':diff>0?'#dc2626':'#6b7280'):'#1e293b';
+      ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+      ctx.fillText(v,startX+18*colW+i*colW+colW/2,y+22);
+    });
+  });
+
+  // Winner row
+  const wy=startY+rowH*4;
+  ctx.fillStyle='#f8fafc';ctx.fillRect(0,wy,W,22);
+  ctx.fillStyle='#64748b';ctx.font='9px sans-serif';ctx.textAlign='left';
+  ctx.fillText('Winner',8,wy+14);
+  PAR.forEach((_,h)=>{
+    const w=holeWinner(h);
+    if(w&&w!=='tie'){
+      ctx.textAlign='center';ctx.font='11px sans-serif';
+      ctx.fillText(TEAMS[w].emoji,startX+h*colW+colW/2,wy+14);
+    }
+  });
+
+  return canvas;
+}
+
+async function exportPDF(){
+  showToast('Generating PDF...');
+  try{
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const canvas=buildScorecardCanvas();
+    const imgData=canvas.toDataURL('image/png');
+    doc.addImage(imgData,'PNG',10,10,277,85);
+
+    // Add recap text
+    let y=105;
+    doc.setFontSize(14);doc.setTextColor(21,128,61);
+    doc.text('Round Summary',10,y);y+=8;
+    doc.setFontSize(10);doc.setTextColor(50,50,50);
+    const t1tot=total('team1'),t2tot=total('team2'),mt=matchTally();
+    const{diff:d1}=toPar('team1'),{diff:d2}=toPar('team2');
+    doc.text(`${names.team1}: ${t1tot||'—'} strokes (${d1===0?'Even':d1>0?`+${d1}`:d1} to par)`,10,y);y+=6;
+    doc.text(`${names.team2}: ${t2tot||'—'} strokes (${d2===0?'Even':d2>0?`+${d2}`:d2} to par)`,10,y);y+=6;
+    doc.text(`Holes won: ${names.team1} ${mt.t1} – ${mt.t2} ${names.team2} · ${mt.ties} tied`,10,y);y+=10;
+
+    // Notes
+    const noteEntries=Object.entries(holeNotes);
+    if(noteEntries.length){
+      doc.setFontSize(12);doc.setTextColor(21,128,61);doc.text('Hole Notes',10,y);y+=7;
+      doc.setFontSize(10);doc.setTextColor(50,50,50);
+      noteEntries.forEach(([h,n])=>{
+        doc.text(`Hole ${parseInt(h)+1}: ${n.note}`,10,y);y+=6;
+      });
+    }
+
+    doc.save('Koppy-Kup-Scorecard.pdf');
+    showToast('PDF downloaded ✓');
+  }catch(e){showToast('PDF error: '+e.message,'e');}
+}
+
+async function exportImage(){
+  showToast('Generating image...');
+  try{
+    const canvas=buildScorecardCanvas();
+    const link=document.createElement('a');
+    link.download='Koppy-Kup-Scorecard.png';
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+    showToast('Image saved ✓');
+  }catch(e){showToast('Image error: '+e.message,'e');}
 }
 
 async function shareRecap(){
@@ -928,17 +1256,59 @@ async function shareRecap(){
 }
 
 // ── SETUP ──
+function buildParInputs(){
+  const front=document.getElementById('par-grid-front');
+  const back=document.getElementById('par-grid-back');
+  if(!front||!back)return;
+  front.innerHTML=Array.from({length:9},(_,i)=>`<div class="par-cell"><span class="par-hole-lbl">${i+1}</span><input class="par-input" id="par-${i}" type="number" min="3" max="6" value="${PAR[i]}" oninput="updateParTotals()"/></div>`).join('');
+  back.innerHTML=Array.from({length:9},(_,i)=>`<div class="par-cell"><span class="par-hole-lbl">${i+10}</span><input class="par-input" id="par-${i+9}" type="number" min="3" max="6" value="${PAR[i+9]}" oninput="updateParTotals()"/></div>`).join('');
+  const cn=document.getElementById('course-name-input');if(cn)cn.value=courseName||'';
+  updateParTotals();
+}
+function updateParTotals(){
+  const vals=Array.from({length:18},(_,i)=>{const inp=document.getElementById('par-'+i);return inp?parseInt(inp.value)||4:PAR[i];});
+  const f=vals.slice(0,9).reduce((a,b)=>a+b,0),b=vals.slice(9).reduce((a,b)=>a+b,0);
+  const el=document.getElementById('par-totals');
+  if(el)el.innerHTML=`<span class="par-total-chip">Front: ${f}</span><span class="par-total-chip">Back: ${b}</span><span class="par-total-chip">Total: ${f+b}</span>`;
+}
+async function saveCourseSettings(){
+  const cn=document.getElementById('course-name-input')?.value?.trim()||'';
+  const newPar=Array.from({length:18},(_,i)=>{const inp=document.getElementById('par-'+i);return inp?parseInt(inp.value)||4:PAR[i];});
+  courseName=cn;PAR=newPar;
+  document.getElementById('hdr-course').textContent=cn?`📍 ${cn}`:'';
+  await Promise.all([saveSetting('course_name',cn),saveSetting('course_par',JSON.stringify(newPar))]);
+  showToast('Course saved ✓');buildTable();renderAll();
+}
+
+function buildPrizeInputs(){
+  const wrap=document.getElementById('prize-inputs');if(!wrap)return;
+  wrap.innerHTML=PRIZES.map((p,i)=>`
+    <div class="prize-input-row">
+      <span class="prize-num">${['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'][i]||i+1}</span>
+      <input class="prize-input" id="prize-${i}" value="${escHtml(typeof p==='string'?p:p.text)}" placeholder="Enter prize #${i+1}"/>
+    </div>`).join('');
+}
+async function savePrizes(){
+  const newPrizes=PRIZES.map((_,i)=>{
+    const val=document.getElementById('prize-'+i)?.value?.trim();
+    return val?{text:val,sub:'Collect your prize!'}:(typeof PRIZES[i]==='object'?PRIZES[i]:DEFAULT_PRIZES[i]);
+  });
+  PRIZES=newPrizes;
+  await saveSetting('custom_prizes',JSON.stringify(newPrizes));
+  showToast('Prizes saved ✓');
+}
+
 function renderSetup(){
-  // Only rebuild par inputs if setup tab is currently visible (prevents resetting mid-edit)
   const setupVisible=document.getElementById('tab-setup')&&document.getElementById('tab-setup').style.display!=='none';
   if(setupVisible)buildParInputs();
   ['team1','team2'].forEach(tid=>{
     const t=TEAMS[tid],card=document.getElementById(tid.replace('team','t')+'card'),pp=players[tid];
+    if(!card)return;
     card.innerHTML=`
       <div class="tc-name" style="color:${t.color}" onclick="startEditName('${tid}')">${t.emoji} <span id="nd-${tid}">${names[tid]}</span><span class="tc-hint">✏️ rename</span></div>
       <div id="nea-${tid}"></div>
       <div class="plbl">Players</div>
-      ${pp.map((_,i)=>`<div class="prow2"><span class="pnum">${i+1}.</span><input class="pinput" id="p-${tid}-${i}" placeholder="Player ${i+1}" value="${pp[i]||''}" style="border-color:${pp[i]?t.color+'40':'rgba(255,255,255,.1)'}" onchange="updatePlayer('${tid}',${i},this.value)" onblur="savePlayerNames('${tid}')"/></div>`).join('')}`;
+      ${pp.map((_,i)=>`<div class="prow2"><span class="pnum">${i+1}.</span><input class="pinput" id="p-${tid}-${i}" placeholder="Player ${i+1}" value="${pp[i]||''}" style="border-color:${pp[i]?t.color+'40':'#cbd5e1'}" onchange="updatePlayer('${tid}',${i},this.value)" onblur="savePlayerNames('${tid}')"/></div>`).join('')}`;
   });
 }
 function startEditName(tid){
@@ -954,7 +1324,7 @@ async function commitName(tid){
 function updatePlayer(tid,i,val){
   players[tid][i]=val;
   const inp=document.getElementById(`p-${tid}-${i}`);
-  if(inp)inp.style.borderColor=val?TEAMS[tid].color+'40':'rgba(255,255,255,.1)';
+  if(inp)inp.style.borderColor=val?TEAMS[tid].color+'40':'#cbd5e1';
 }
 async function savePlayerNames(tid){await saveSetting(tid+'_players',JSON.stringify(players[tid]));renderTeamRows();renderTrash();}
 
@@ -980,9 +1350,11 @@ async function commitEdit(){
 function getWinner(){const t1=total('team1'),t2=total('team2');if(!t1&&!t2)return null;if(t1&&t2){if(t1<t2)return'team1';if(t2<t1)return'team2';return'tie';}return null;}
 function openPrize(){
   const winner=getWinner(),prize=PRIZES[Math.floor(Math.random()*PRIZES.length)];
-  document.getElementById('prize-text').textContent=prize.text;document.getElementById('prize-sub').textContent=prize.sub;
+  const pt=typeof prize==='string'?prize:prize.text;
+  const ps=typeof prize==='object'?prize.sub:'Collect your prize!';
+  document.getElementById('prize-text').textContent=pt;document.getElementById('prize-sub').textContent=ps;
   if(winner&&winner!=='tie'){const t=TEAMS[winner],{diff}=toPar(winner);document.getElementById('ptrophy').textContent='🏆';document.getElementById('pwname').textContent=`${t.emoji} ${names[winner]}`;document.getElementById('pwname').style.color=t.color;document.getElementById('pwscore').textContent=`${total(winner)} · ${diff===0?'Even':diff>0?`+${diff}`:diff} to par`;launchConfetti(t.color);}
-  else if(winner==='tie'){document.getElementById('ptrophy').textContent='🤝';document.getElementById('pwname').textContent="It's a Tie!";document.getElementById('pwname').style.color='#f59e0b';document.getElementById('pwscore').textContent='Share the glory!';}
+  else if(winner==='tie'){document.getElementById('ptrophy').textContent='🤝';document.getElementById('pwname').textContent="It's a Tie!";document.getElementById('pwname').style.color='#d97706';document.getElementById('pwscore').textContent='Share the glory!';}
   else{document.getElementById('ptrophy').textContent='⛳';document.getElementById('pwname').textContent='Round in Progress';document.getElementById('pwname').style.color='#6b7280';document.getElementById('pwscore').textContent='Finish the round first!';}
   document.getElementById('prize-overlay').classList.remove('hidden');
   scratchDone=false;document.getElementById('shint').style.display='block';initScratch();
@@ -1007,9 +1379,51 @@ function initScratch(){
 }
 function launchConfetti(col){
   const wrap=document.getElementById('confwrap');wrap.innerHTML='';
-  const cols=['#f59e0b','#4ade80','#fff','#fbbf24',col||'#16a34a','#86efac'];
+  const cols=['#f59e0b','#16a34a','#fff','#fbbf24',col||'#16a34a','#bbf7d0'];
   for(let i=0;i<80;i++){const el=document.createElement('div');el.className='cp';const sz=6+Math.random()*8;el.style.cssText=`left:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:${cols[Math.floor(Math.random()*cols.length)]};border-radius:${Math.random()>.5?'50%':'2px'};animation-duration:${2+Math.random()*2}s;animation-delay:${Math.random()*.8}s;`;wrap.appendChild(el);}
   setTimeout(()=>wrap.innerHTML='',5000);
+}
+
+// ── CLEAR GAME ──
+function confirmClear(type){
+  pendingClearType=type;
+  if(type==='round'){
+    document.getElementById('confirm-icon').textContent='🔄';
+    document.getElementById('confirm-title').textContent='Start New Round?';
+    document.getElementById('confirm-msg').textContent='Clears scores and side bets. Team names, players, course, prizes, and history stay.';
+    document.getElementById('confirm-ok-btn').textContent='Yes, Clear Scores';
+    document.getElementById('confirm-ok-btn').style.background='#d97706';
+  }else{
+    document.getElementById('confirm-icon').textContent='🗑️';
+    document.getElementById('confirm-title').textContent='End Game & Clear All?';
+    document.getElementById('confirm-msg').textContent='Clears scores, side bets, trash talk, photos, and notes. History is always preserved.';
+    document.getElementById('confirm-ok-btn').textContent='Yes, End Game';
+    document.getElementById('confirm-ok-btn').style.background='#dc2626';
+  }
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+function closeConfirm(){document.getElementById('confirm-overlay').classList.add('hidden');pendingClearType=null;}
+async function executeClear(){
+  const type=pendingClearType;closeConfirm();showToast('Clearing...');
+  try{
+    await sb.from('scores').delete().in('team_id',['team1','team2']);
+    await sb.from('sidebets').delete().gte('hole',0);
+    if(type==='all'){
+      await sb.from('trash').delete().gte('created_at','2000-01-01');
+      await sb.from('hole_notes').delete().gte('hole',0);
+      // Delete all photos from storage then DB
+      if(photos.length){
+        const paths=photos.map(p=>p.url.split('/hole-photos/')[1]).filter(Boolean);
+        if(paths.length)await sb.storage.from('hole-photos').remove(paths);
+      }
+      await sb.from('photos').delete().gte('hole',0);
+      trashMsgs=[];photos=[];holeNotes={};
+    }
+    scores={team1:{},team2:{}};sideBets={};
+    showToast('Cleared ✓');
+    renderTeamRows();renderWinnerRow();renderNoteRow();renderBanner();
+    renderMomentum();renderSideBets();renderRecap();renderTrash();renderPhotos();
+  }catch(e){showToast('Error: '+(e.message||String(e)),'e');}
 }
 
 // ── HELPERS ──
@@ -1019,67 +1433,16 @@ function back(tid){let t=0;for(let h=9;h<18;h++)t+=scores[tid]?.[h]||0;return t|
 function toPar(tid){let d=0,c=0;for(let h=0;h<18;h++)if(scores[tid]?.[h]){d+=scores[tid][h]-PAR[h];c++;}return{diff:d,count:c};}
 function holeWinner(h){const s1=scores.team1?.[h],s2=scores.team2?.[h];if(!s1||!s2)return null;if(s1<s2)return'team1';if(s2<s1)return'team2';return'tie';}
 function matchTally(){let t1=0,t2=0,ties=0;for(let h=0;h<18;h++){const w=holeWinner(h);if(w==='team1')t1++;else if(w==='team2')t2++;else if(w==='tie')ties++;}return{t1,t2,ties};}
-function showToast(msg,type='s'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type}`;el.style.display='block';setTimeout(()=>el.style.display='none',2200);}
+function showToast(msg,type='s'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type}`;el.style.display='block';setTimeout(()=>el.style.display='none',2400);}
 function pickTeam(tid){myTeam=tid;localStorage.setItem('kk_myteam',tid);renderAll();}
 function switchTeam(){myTeam=null;localStorage.removeItem('kk_myteam');renderAll();}
 function swTab(name,btn){
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-  ['scorecard','momentum','trash','sidebets','history','recap','setup'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===name?'block':'none';});
+  ['scorecard','momentum','trash','sidebets','photos','history','recap','setup'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===name?'block':'none';});
   if(name==='momentum')setTimeout(drawSwingChart,50);
   if(name==='recap')renderRecap();
-  if(name==='setup'){renderSetup();}
-}
-
-// ── CLEAR GAME ──
-let pendingClearType=null;
-function confirmClear(type){
-  pendingClearType=type;
-  const overlay=document.getElementById('confirm-overlay');
-  if(type==='round'){
-    document.getElementById('confirm-icon').textContent='🔄';
-    document.getElementById('confirm-title').textContent='Start New Round?';
-    document.getElementById('confirm-msg').textContent='This will delete all scores and side bets for everyone. Team names, players, course setup, and history will be kept.';
-    document.getElementById('confirm-ok-btn').textContent='Yes, Clear Scores';
-    document.getElementById('confirm-ok-btn').style.background='#d97706';
-  }else{
-    document.getElementById('confirm-icon').textContent='🗑️';
-    document.getElementById('confirm-title').textContent='End Game & Clear All?';
-    document.getElementById('confirm-msg').textContent='This will delete all scores, side bets, and trash talk for everyone. History and team info will be kept.';
-    document.getElementById('confirm-ok-btn').textContent='Yes, End Game';
-    document.getElementById('confirm-ok-btn').style.background='#dc2626';
-  }
-  overlay.classList.remove('hidden');
-}
-function closeConfirm(){
-  document.getElementById('confirm-overlay').classList.add('hidden');
-  pendingClearType=null;
-}
-async function executeClear(){
-  const type=pendingClearType;
-  closeConfirm();
-  showToast('Clearing...');
-  try{
-    await sb.from('scores').delete().in('team_id',['team1','team2']);
-    await sb.from('sidebets').delete().gte('hole',0);
-    if(type==='all'){
-      await sb.from('trash').delete().gte('created_at','2000-01-01');
-      trashMsgs=[];
-    }
-    // Directly reset local state — don't rely on loadAll re-fetch
-    scores={team1:{},team2:{}};
-    sideBets={};
-    showToast('Cleared ✓');
-    // Force full re-render with empty state
-    renderTeamRows();
-    renderWinnerRow();
-    renderBanner();
-    renderMomentum();
-    renderSideBets();
-    renderRecap();
-    renderTrash();
-  }catch(e){
-    showToast('Error: '+(e.message||String(e)),'e');
-  }
+  if(name==='setup')renderSetup();
+  if(name==='photos'){buildPhotoHoleSel();renderPhotos();}
 }
 
 window.addEventListener('load',init);
