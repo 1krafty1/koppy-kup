@@ -1059,28 +1059,21 @@ async function executeClear(){
   closeConfirm();
   showToast('Clearing...');
   try{
-    // Test with a single delete first and log full response
     const test=await sb.from('scores').delete().in('team_id',['team1','team2']);
-    console.log('scores delete response:',JSON.stringify(test));
-    if(test.error){
-      showToast('Score delete failed: '+test.error.message,'e');
-      return;
-    }
+    if(test.error){showToast('Error: '+test.error.message,'e');return;}
     const r2=await sb.from('sidebets').delete().gte('hole',0);
-    console.log('sidebets delete response:',JSON.stringify(r2));
     if(type==='all'){
-      const r3=await sb.from('trash').delete().gte('created_at','2000-01-01');
-      console.log('trash delete response:',JSON.stringify(r3));
-      trashMsgs=[];
+      await sb.from('trash').delete().gte('created_at','2000-01-01');
     }
+    // Reset local state then reload from DB to confirm
     scores={team1:{},team2:{}};
     sideBets={};
+    if(type==='all')trashMsgs=[];
+    await loadAll();
+    if(type==='all')await loadTrash();
     showToast('Cleared ✓');
-    renderAll();
-    renderTrash();
   }catch(e){
-    console.error('Clear exception:',e);
-    showToast('Exception: '+(e.message||String(e)),'e');
+    showToast('Error: '+(e.message||String(e)),'e');
   }
 }
 
