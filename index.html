@@ -226,6 +226,10 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .cfgf input{width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--bor);border-radius:8px;color:var(--tx);font-family:inherit;font-size:13px;}
 .cfgf input:focus{outline:none;border-color:var(--gl);}
 .cfgsave{width:100%;padding:12px;background:var(--gb);border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
+.clear-btn{width:100%;padding:12px;background:#fff;border:1px solid #fca5a5;border-radius:9px;color:#dc2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;}
+.clear-btn:active{background:#fee2e2;}
+.clear-btn.danger{border-color:#dc2626;background:#fff5f5;}
+.clear-btn.danger:active{background:#fee2e2;}
 .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);padding:9px 20px;border-radius:9px;font-size:13px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.2);z-index:200;animation:tin .25s ease;pointer-events:none;white-space:nowrap;}
 .toast.s{background:#166534;border:1px solid #4ade80;color:#fff;}
 .toast.e{background:#7f1d1d;border:1px solid #f87171;color:#fff;}
@@ -392,7 +396,28 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div id="t2card" class="team-card" style="border:1px solid rgba(220,38,38,.25);"></div>
       <div class="div"></div>
       <button class="snbtn" onclick="loadAll()">⟳ Sync Now</button>
+      <div class="div"></div>
+      <div class="stitle">Game Controls</div>
+      <button class="clear-btn" onclick="confirmClear('round')">🔄 Clear Scores — Start New Round</button>
+      <button class="clear-btn danger" onclick="confirmClear('all')" style="margin-top:8px;">🗑️ End Game — Clear Everything</button>
+      <div style="font-size:11px;color:var(--mu);margin-top:8px;line-height:1.6;">
+        <strong>New Round</strong> clears scores and side bets only. Team names, players, course, and history stay.<br/>
+        <strong>End Game</strong> clears scores, side bets, and trash talk. History is preserved.
+      </div>
       <div class="ibox g">💡 Scores save instantly. Other phones update every 15s or tap ⟳.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="moverlay hidden" id="confirm-overlay">
+  <div class="pmodal" style="max-width:320px;">
+    <div style="font-size:36px;margin-bottom:10px;" id="confirm-icon">⚠️</div>
+    <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:var(--tx);margin-bottom:8px;" id="confirm-title">Are you sure?</div>
+    <div style="font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.5;" id="confirm-msg">This cannot be undone.</div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeConfirm()" style="flex:1;padding:11px;background:var(--bg2);border:1px solid var(--bor);border-radius:9px;font-family:inherit;font-size:14px;cursor:pointer;color:var(--mu);">Cancel</button>
+      <button id="confirm-ok-btn" onclick="executeClear()" style="flex:1;padding:11px;background:#dc2626;border:none;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#fff;">Yes, Clear</button>
     </div>
   </div>
 </div>
@@ -1003,6 +1028,51 @@ function swTab(name,btn){
   if(name==='momentum')setTimeout(drawSwingChart,50);
   if(name==='recap')renderRecap();
   if(name==='setup'){renderSetup();}
+}
+
+// ── CLEAR GAME ──
+let pendingClearType=null;
+function confirmClear(type){
+  pendingClearType=type;
+  const overlay=document.getElementById('confirm-overlay');
+  if(type==='round'){
+    document.getElementById('confirm-icon').textContent='🔄';
+    document.getElementById('confirm-title').textContent='Start New Round?';
+    document.getElementById('confirm-msg').textContent='This will delete all scores and side bets for everyone. Team names, players, course setup, and history will be kept.';
+    document.getElementById('confirm-ok-btn').textContent='Yes, Clear Scores';
+    document.getElementById('confirm-ok-btn').style.background='#d97706';
+  }else{
+    document.getElementById('confirm-icon').textContent='🗑️';
+    document.getElementById('confirm-title').textContent='End Game & Clear All?';
+    document.getElementById('confirm-msg').textContent='This will delete all scores, side bets, and trash talk for everyone. History and team info will be kept.';
+    document.getElementById('confirm-ok-btn').textContent='Yes, End Game';
+    document.getElementById('confirm-ok-btn').style.background='#dc2626';
+  }
+  overlay.classList.remove('hidden');
+}
+function closeConfirm(){
+  document.getElementById('confirm-overlay').classList.add('hidden');
+  pendingClearType=null;
+}
+async function executeClear(){
+  const type=pendingClearType;
+  closeConfirm();
+  showToast('Clearing...');
+  try{
+    await Promise.all([
+      sb.from('scores').delete().neq('id','00000000-0000-0000-0000-000000000000'),
+      sb.from('sidebets').delete().neq('hole',-1),
+    ]);
+    if(type==='all'){
+      await sb.from('trash').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      trashMsgs=[];
+    }
+    scores={team1:{},team2:{}};
+    sideBets={};
+    showToast('Cleared ✓');
+    renderAll();
+    renderTrash();
+  }catch(e){showToast('Error clearing — try again','e');}
 }
 
 window.addEventListener('load',init);
