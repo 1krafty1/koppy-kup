@@ -709,6 +709,23 @@ function drawSwingChart(){
 // ── TRASH ──
 function renderTrash(){
   const feed=document.getElementById('ttfeed');
+  // Always render sender selector regardless of message count
+  const all=[...players.team1,...players.team2].filter(p=>p);
+  const tssel=document.getElementById('tt-sender-sel');
+  if(all.length){
+    tssel.innerHTML=all.map(name=>{
+      const tid=players.team1.includes(name)?'team1':'team2';
+      const t=TEAMS[tid],sel=ttSender===name;
+      return`<button class="tt-sel-btn" style="${sel?`background:${t.color}30;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${name}','${tid}')">${t.emoji} ${name}</button>`;
+    }).join('');
+  }else{
+    // No player names set — show team buttons as fallback
+    tssel.innerHTML=`<div style="font-size:10px;color:var(--mu);width:100%;margin-bottom:4px;">Sending as:</div>`+
+      Object.entries(TEAMS).map(([tid,t])=>{
+        const sel=ttSender===tid;
+        return`<button class="tt-sel-btn" style="${sel?`background:${t.color}30;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${tid}','${tid}')">${t.emoji} ${names[tid]}</button>`;
+      }).join('');
+  }
   if(!trashMsgs.length){feed.innerHTML='<div class="empty-feed">🤫 No trash talk yet.<br/>Someone start something.</div>';return;}
   feed.innerHTML=trashMsgs.map(m=>{
     const t=TEAMS[m.team_id]||{color:'#9ca3af',emoji:'💬'};
@@ -721,23 +738,18 @@ function renderTrash(){
     </div>`;
   }).join('');
   feed.scrollTop=feed.scrollHeight;
-  const all=[...players.team1,...players.team2].filter(p=>p);
-  const tssel=document.getElementById('tt-sender-sel');
-  tssel.innerHTML=all.length?all.map(name=>{
-    const tid=players.team1.includes(name)?'team1':'team2';
-    const t=TEAMS[tid],sel=ttSender===name;
-    return`<button class="tt-sel-btn" style="${sel?`background:${t.color}30;border-color:${t.color};color:${t.color};font-weight:700`:'color:var(--mu)'}" onclick="setTTSender('${name}')">${t.emoji} ${name}</button>`;
-  }).join(''):'<div style="font-size:11px;color:var(--mu);">Add player names in Setup to chat</div>';
 }
-function setTTSender(name){ttSender=name;localStorage.setItem('kk_ttsender',name);renderTrash();}
+function setTTSender(name,tid){ttSender=name;localStorage.setItem('kk_ttsender',name);renderTrash();}
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 async function sendTrash(){
   const inp=document.getElementById('ttinput'),msg=inp.value.trim();
   if(!msg)return;
-  if(!ttSender){showToast('Pick your name above first','e');return;}
-  const tid=players.team1.includes(ttSender)?'team1':'team2';
+  if(!ttSender){showToast('Pick your team above first','e');return;}
+  // Determine team: if ttSender is a team id use it directly, else look up by player name
+  const tid=TEAMS[ttSender]?ttSender:(players.team1.includes(ttSender)?'team1':'team2');
+  const displayName=TEAMS[ttSender]?names[ttSender]:ttSender;
   inp.value='';
-  await sb.from('trash').insert({team_id:tid,sender_name:ttSender,message:msg,reactions:'{}'});
+  await sb.from('trash').insert({team_id:tid,sender_name:displayName,message:msg,reactions:'{}'});
   await loadTrash();
 }
 async function reactMsg(id,emoji){
