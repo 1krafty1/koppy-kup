@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   --bg:#f8fafc;--bg2:#f1f5f9;--bg3:#e2e8f0;
@@ -425,6 +426,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
           <button class="upload-btn" onclick="document.getElementById('photo-file-input').click()">📷 Add Photo</button>
         </div>
         <div id="upload-progress" style="display:none;margin-top:8px;font-size:12px;color:var(--mu);">Uploading...</div>
+        <button id="download-all-btn" onclick="downloadAllPhotos()" style="display:none;width:100%;margin-top:10px;padding:10px;background:#2563eb;border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">📦 Download All Photos as ZIP</button>
       </div>
       <div id="photo-gallery"></div>
     </div>
@@ -506,10 +508,29 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
 <!-- CONFIRM MODAL -->
 <div class="moverlay hidden" id="confirm-overlay">
-  <div class="pmodal" style="max-width:320px;">
+  <div class="pmodal" style="max-width:340px;max-height:90vh;overflow-y:auto;">
     <div style="font-size:36px;margin-bottom:10px;" id="confirm-icon">⚠️</div>
     <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:var(--tx);margin-bottom:8px;" id="confirm-title">Are you sure?</div>
-    <div style="font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.5;" id="confirm-msg">This cannot be undone.</div>
+    <div style="font-size:13px;color:var(--mu);margin-bottom:16px;line-height:1.5;" id="confirm-msg">This cannot be undone.</div>
+    <!-- Save to history section (shown for End Game only) -->
+    <div id="confirm-history-section" style="display:none;background:var(--gp);border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-bottom:16px;text-align:left;">
+      <div style="font-size:12px;font-weight:700;color:var(--gl);margin-bottom:8px;">💾 Save this round to History first?</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div style="flex:1;">
+          <div style="font-size:10px;color:var(--mu);margin-bottom:3px;">YEAR</div>
+          <input id="eg-year" type="number" style="width:100%;padding:6px 8px;background:#fff;border:1px solid var(--bor);border-radius:6px;font-family:inherit;font-size:14px;color:var(--tx);" value="${new Date().getFullYear()}"/>
+        </div>
+        <div style="flex:2;">
+          <div style="font-size:10px;color:var(--mu);margin-bottom:3px;">COURSE</div>
+          <input id="eg-course" type="text" style="width:100%;padding:6px 8px;background:#fff;border:1px solid var(--bor);border-radius:6px;font-family:inherit;font-size:14px;color:var(--tx);" placeholder="Course name"/>
+        </div>
+      </div>
+      <div id="eg-scores-preview" style="font-size:12px;color:var(--tx2);margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="checkbox" id="eg-save-history" checked style="width:16px;height:16px;accent-color:var(--gb);"/>
+        <label for="eg-save-history" style="font-size:12px;color:var(--tx2);cursor:pointer;">Save round to History before clearing</label>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;">
       <button onclick="closeConfirm()" style="flex:1;padding:11px;background:var(--bg2);border:1px solid var(--bor);border-radius:9px;font-family:inherit;font-size:14px;cursor:pointer;color:var(--mu);">Cancel</button>
       <button id="confirm-ok-btn" onclick="executeClear()" style="flex:1;padding:11px;background:#dc2626;border:none;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#fff;">Yes, Clear</button>
@@ -818,6 +839,8 @@ async function uploadPhoto(input){
 
 function renderPhotos(){
   const gallery=document.getElementById('photo-gallery');if(!gallery)return;
+  const dlBtn=document.getElementById('download-all-btn');
+  if(dlBtn)dlBtn.style.display=photos.length?'block':'none';
   if(!photos.length){gallery.innerHTML='<div class="no-photos">📸 No photos yet.<br/>Be the first to add one!</div>';return;}
   const byHole={};
   photos.forEach(p=>{if(!byHole[p.hole])byHole[p.hole]=[];byHole[p.hole].push(p);});
@@ -835,6 +858,34 @@ function renderPhotos(){
       </div>
     </div>`;
   }).join('');
+}
+
+async function downloadAllPhotos(){
+  if(!photos.length){showToast('No photos to download','e');return;}
+  showToast('Building ZIP...');
+  const dlBtn=document.getElementById('download-all-btn');
+  dlBtn.textContent='⏳ Downloading...';dlBtn.disabled=true;
+  try{
+    const zip=new JSZip();
+    const folder=zip.folder('Koppy-Kup-Photos');
+    let count=0;
+    for(const p of photos){
+      try{
+        const resp=await fetch(p.url);
+        const blob=await resp.blob();
+        const ext=p.url.split('.').pop().split('?')[0]||'jpg';
+        const fname=`Hole-${parseInt(p.hole)+1}_${p.uploader_name||'photo'}_${count+1}.${ext}`;
+        folder.file(fname,blob);count++;
+      }catch{}
+    }
+    const content=await zip.generateAsync({type:'blob'});
+    const url=URL.createObjectURL(content);
+    const a=document.createElement('a');
+    a.href=url;a.download=`Koppy-Kup-Photos-${new Date().getFullYear()}.zip`;
+    a.click();URL.revokeObjectURL(url);
+    showToast(`Downloaded ${count} photos ✓`);
+  }catch(e){showToast('Download failed: '+e.message,'e');}
+  dlBtn.textContent='📦 Download All Photos as ZIP';dlBtn.disabled=false;
 }
 
 async function deletePhoto(id,url){
@@ -1387,31 +1438,53 @@ function launchConfetti(col){
 // ── CLEAR GAME ──
 function confirmClear(type){
   pendingClearType=type;
+  const histSection=document.getElementById('confirm-history-section');
   if(type==='round'){
     document.getElementById('confirm-icon').textContent='🔄';
     document.getElementById('confirm-title').textContent='Start New Round?';
     document.getElementById('confirm-msg').textContent='Clears scores and side bets. Team names, players, course, prizes, and history stay.';
     document.getElementById('confirm-ok-btn').textContent='Yes, Clear Scores';
     document.getElementById('confirm-ok-btn').style.background='#d97706';
+    histSection.style.display='none';
   }else{
     document.getElementById('confirm-icon').textContent='🗑️';
     document.getElementById('confirm-title').textContent='End Game & Clear All?';
     document.getElementById('confirm-msg').textContent='Clears scores, side bets, trash talk, photos, and notes. History is always preserved.';
     document.getElementById('confirm-ok-btn').textContent='Yes, End Game';
     document.getElementById('confirm-ok-btn').style.background='#dc2626';
+    histSection.style.display='block';
+    // Pre-fill course name and show score preview
+    document.getElementById('eg-course').value=courseName||'';
+    const t1tot=total('team1'),t2tot=total('team2');
+    const{diff:d1}=toPar('team1'),{diff:d2}=toPar('team2');
+    const fmtD=d=>d===0?'E':d>0?`+${d}`:d;
+    document.getElementById('eg-scores-preview').innerHTML=
+      `<strong>${TEAMS.team1.emoji} ${names.team1}:</strong> ${t1tot||'—'} ${t1tot?`(${fmtD(d1)})`:''} &nbsp;|&nbsp; <strong>${TEAMS.team2.emoji} ${names.team2}:</strong> ${t2tot||'—'} ${t2tot?`(${fmtD(d2)})`:''} &nbsp;|&nbsp; Par: ${TPAR()}`;
   }
   document.getElementById('confirm-overlay').classList.remove('hidden');
 }
 function closeConfirm(){document.getElementById('confirm-overlay').classList.add('hidden');pendingClearType=null;}
 async function executeClear(){
-  const type=pendingClearType;closeConfirm();showToast('Clearing...');
+  const type=pendingClearType;closeConfirm();
+  // Save to history if End Game and checkbox checked
+  if(type==='all'&&document.getElementById('eg-save-history')?.checked){
+    const year=parseInt(document.getElementById('eg-year')?.value)||new Date().getFullYear();
+    const course=document.getElementById('eg-course')?.value?.trim()||courseName||'';
+    const s1=total('team1')||null,s2=total('team2')||null;
+    const par=TPAR();
+    const winner=s1&&s2?(s1<s2?'team1':s2<s1?'team2':'tie'):null;
+    try{
+      await sb.from('history').upsert({year,course_name:course,score1:s1,score2:s2,par1:par,par2:par,winner,notes:''},{onConflict:'year'});
+      showToast('Round saved to History ✓');
+    }catch(e){showToast('History save failed','e');}
+  }
+  showToast('Clearing...');
   try{
     await sb.from('scores').delete().in('team_id',['team1','team2']);
     await sb.from('sidebets').delete().gte('hole',0);
     if(type==='all'){
       await sb.from('trash').delete().gte('created_at','2000-01-01');
       await sb.from('hole_notes').delete().gte('hole',0);
-      // Delete all photos from storage then DB
       if(photos.length){
         const paths=photos.map(p=>p.url.split('/hole-photos/')[1]).filter(Boolean);
         if(paths.length)await sb.storage.from('hole-photos').remove(paths);
@@ -1423,6 +1496,7 @@ async function executeClear(){
     showToast('Cleared ✓');
     renderTeamRows();renderWinnerRow();renderNoteRow();renderBanner();
     renderMomentum();renderSideBets();renderRecap();renderTrash();renderPhotos();
+    if(type==='all')renderHistory();
   }catch(e){showToast('Error: '+(e.message||String(e)),'e');}
 }
 
