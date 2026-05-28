@@ -1059,12 +1059,15 @@ async function executeClear(){
   closeConfirm();
   showToast('Clearing...');
   try{
-    await Promise.all([
-      sb.from('scores').delete().neq('id','00000000-0000-0000-0000-000000000000'),
-      sb.from('sidebets').delete().neq('hole',-1),
+    const[r1,r2]=await Promise.all([
+      sb.from('scores').delete().in('team_id',['team1','team2']),
+      sb.from('sidebets').delete().gte('hole',0),
     ]);
+    if(r1.error)throw r1.error;
+    if(r2.error)throw r2.error;
     if(type==='all'){
-      await sb.from('trash').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      const r3=await sb.from('trash').delete().gte('created_at','2000-01-01');
+      if(r3.error)throw r3.error;
       trashMsgs=[];
     }
     scores={team1:{},team2:{}};
@@ -1072,7 +1075,10 @@ async function executeClear(){
     showToast('Cleared ✓');
     renderAll();
     renderTrash();
-  }catch(e){showToast('Error clearing — try again','e');}
+  }catch(e){
+    console.error('Clear error:',e);
+    showToast('Error: '+( e.message||'check console'),'e');
+  }
 }
 
 window.addEventListener('load',init);
