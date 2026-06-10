@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="manifest" href="manifest.json"/>
 <style>
 :root{
   --bg:#f8fafc;--bg2:#f1f5f9;--bg3:#e2e8f0;
@@ -284,6 +285,18 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 .toast.s{background:#166534;border:1px solid #4ade80;color:#fff;}
 .toast.e{background:#7f1d1d;border:1px solid #f87171;color:#fff;}
 @keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+/* Stepper buttons */
+.stepper-group{display:flex;align-items:center;gap:2px;justify-content:center;}
+.step-btn{width:28px;height:40px;border:1px solid var(--bor);border-radius:4px;background:var(--bg2);color:var(--tx);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.step-btn:active{background:var(--bg3);}
+.step-val{min-width:28px;height:40px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;color:var(--tx);}
+/* Undo floating button */
+.undo-float{position:fixed;bottom:80px;right:16px;background:#1e293b;border:none;border-radius:24px;color:#fff;padding:10px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:50;}
+/* PIN header button */
+.pin-btn{position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);border-radius:8px;color:#fff;padding:7px 11px;font-size:16px;cursor:pointer;}
+/* Round lock */
+.lock-bar{background:#fef3c7;border:1px solid #fde68a;border-radius:9px;margin:8px 12px 0;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;}
+.lock-bar span{font-size:13px;color:#92400e;font-weight:700;}
 </style>
 </head>
 <body>
@@ -300,6 +313,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 
 <div id="app" style="display:none;">
   <div class="hdr">
+    <button class="pin-btn" id="pin-btn" onclick="showPinModal()">🔒</button>
     <div class="hdr-eye">⛳ Texas Scramble · Live Scoring</div>
     <div class="hdr-title">🏆 Koppy Kup Classic</div>
     <div class="hdr-course" id="hdr-course"></div>
@@ -350,6 +364,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <button class="tbtn" onclick="swTab('history',this)">🏅 History</button>
     <button class="tbtn" onclick="swTab('recap',this)">🎉 Recap</button>
     <button class="tbtn" onclick="swTab('setup',this)">⚙️ Setup</button>
+    <button class="tbtn" onclick="swTab('liveentry',this)">🎯 Live Entry</button>
   </div>
 
   <!-- SCORECARD -->
@@ -375,6 +390,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <div class="li"><div style="width:16px;height:16px;background:#fecaca;border:2px solid #dc2626;border-radius:3px;"></div>Double+</div>
         <div class="li">📝 = hole note</div>
       </div>
+    </div>
+    <div id="lock-bar" class="lock-bar" style="display:none;">
+      <span>🔒 Round Locked — Read Only</span>
+      <button onclick="unlockRound()" style="background:#d97706;border:none;border-radius:7px;color:#fff;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Unlock</button>
+    </div>
+    <div style="padding:4px 12px;">
+      <button id="lock-btn" onclick="lockRound()" style="display:none;width:100%;padding:12px;background:#d97706;border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">🔒 Lock Round</button>
     </div>
     <div class="pbwrap">
       <button class="pbtn2" onclick="openPrize()">🏆 Reveal the Prize 🏆</button>
@@ -488,6 +510,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
       <div class="ibox g">💡 Scores save instantly. Other phones update every 15s or tap ⟳.</div>
     </div>
   </div>
+
+  <!-- LIVE ENTRY -->
+  <div id="tab-liveentry" style="display:none;">
+    <div id="le-wrap"></div>
+  </div>
 </div>
 
 <!-- PRIZE MODAL -->
@@ -558,6 +585,23 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <img id="lightbox-img" src="" alt=""/>
 </div>
 
+
+<button id="undo-btn" class="undo-float" style="display:none;" onclick="undoLast()">↩ Undo</button>
+
+<!-- PIN MODAL -->
+<div class="moverlay hidden" id="pin-overlay">
+  <div class="pmodal" style="max-width:300px;">
+    <div style="font-size:36px;margin-bottom:8px;">🔒</div>
+    <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:var(--tx);margin-bottom:8px;">Host PIN</div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:16px;" id="pin-msg">Enter or set your 4-digit PIN.</div>
+    <input id="pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%;text-align:center;font-size:32px;letter-spacing:8px;padding:12px;border:2px solid var(--bor);border-radius:9px;font-family:inherit;margin-bottom:12px;background:var(--bg2);color:var(--tx);" onkeydown="if(event.key==='Enter')checkPin()"/>
+    <div style="display:flex;gap:8px;">
+      <button onclick="closePinModal()" style="flex:1;padding:11px;background:var(--bg2);border:1px solid var(--bor);border-radius:9px;font-family:inherit;font-size:14px;cursor:pointer;color:var(--mu);">Cancel</button>
+      <button onclick="checkPin()" style="flex:1;padding:11px;background:var(--gb);border:none;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#fff;">Enter</button>
+    </div>
+  </div>
+</div>
+
 <div class="confwrap" id="confwrap"></div>
 <div id="loading" class="loading" style="padding-top:80px;"><div class="spin"></div><br/>Loading Koppy Kup...</div>
 <div id="toast" class="toast" style="display:none;"></div>
@@ -598,6 +642,11 @@ let myTeam=localStorage.getItem('kk_myteam')||null;
 let ttSender=localStorage.getItem('kk_ttsender')||null;
 let editingCell=null,scratchDone=false;
 let pendingClearType=null,pendingNoteHole=null;
+let roundLocked=localStorage.getItem('kk_locked')==='1';
+let lastAction=null;
+let currentLiveHole=0;
+let adminMode=false;
+let undoTimer=null;
 
 // ── CONFIG ──
 function saveConfig(){
@@ -631,6 +680,7 @@ async function init(){
     .on('postgres_changes',{event:'*',schema:'public',table:'sidebets'},()=>loadSideBets())
     .on('postgres_changes',{event:'*',schema:'public',table:'photos'},()=>loadPhotos())
     .on('postgres_changes',{event:'*',schema:'public',table:'hole_notes'},()=>loadNotes())
+    .on('postgres_changes',{event:'*',schema:'public',table:'history'},()=>loadAll())
     .subscribe();
 }
 
@@ -693,10 +743,12 @@ function buildTable(){
 // ── RENDER ALL ──
 function renderAll(){
   buildTable();
-  renderTeamRows();renderWinnerRow();renderNoteRow();renderBanner();
+  if(!document.getElementById('ai')){renderTeamRows();renderWinnerRow();renderBanner();}
+  renderNoteRow();
   renderSetup();renderTeamPicker();
   renderMomentum();renderSideBets();
   renderHistory();renderRecap();
+  checkAllScored();
 }
 
 function scClass(s,par){
@@ -980,11 +1032,11 @@ function renderTrash(){
   feed.innerHTML=trashMsgs.map(m=>{
     const t=TEAMS[m.team_id]||{color:'#9ca3af',emoji:'💬'};
     const ts=new Date(m.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    const reactions=m.reactions?JSON.parse(m.reactions):{};
+    const reactions=typeof m.reactions==='string'?JSON.parse(m.reactions):(m.reactions||{});
     return`<div class="ttmsg" style="border-color:${t.color}">
-      <div class="ttmsg-header"><span class="ttmsg-author" style="color:${t.color}">${t.emoji} ${m.sender_name}</span><span class="ttmsg-time">${ts}</span></div>
+      <div class="ttmsg-header"><span class="ttmsg-author" style="color:${t.color}">${t.emoji} ${escHtml(m.sender_name)}</span><span class="ttmsg-time">${ts}</span></div>
       <div class="ttmsg-text">${escHtml(m.message)}</div>
-      <div class="ttmsg-reactions">${EMOJIS.map(e=>{const c=reactions[e]||0;return`<button class="react-btn ${c>0?'reacted':''}" onclick="reactMsg('${m.id}','${e}')">${e}${c>0?` ${c}`:''}</button>`;}).join('')}</div>
+      <div class="ttmsg-reactions">${EMOJIS.map(e=>{const c=reactions[e]||0;return`<button class="react-btn ${c>0?'reacted':''}" onclick="reactMsg('${escHtml(String(m.id))}','${e}')">${e}${c>0?` ${c}`:''}</button>`;}).join('')}</div>
     </div>`;
   }).join('');
   feed.scrollTop=feed.scrollHeight;
@@ -1003,7 +1055,7 @@ async function sendTrash(){
 }
 async function reactMsg(id,emoji){
   const msg=trashMsgs.find(m=>m.id===id);if(!msg)return;
-  const reactions=msg.reactions?JSON.parse(msg.reactions):{};
+  const reactions=typeof msg.reactions==='string'?JSON.parse(msg.reactions):(msg.reactions||{});
   reactions[emoji]=(reactions[emoji]||0)+1;
   await sb.from('trash').update({reactions:JSON.stringify(reactions)}).eq('id',id);
   await loadTrash();
@@ -1115,7 +1167,7 @@ function renderRecap(){
   let battleHole=null,battleDiff=99;
   for(let h=0;h<18;h++){const s1=scores.team1?.[h],s2=scores.team2?.[h];if(s1&&s2){const d=Math.abs(s1-s2);if(d<battleDiff){battleDiff=d;battleHole=h;}}}
   let sb1ctp=0,sb2ctp=0,sb1ld=0,sb2ld=0;
-  Object.values(sideBets).forEach(sb=>{if(sb.ctpin==='team1')sb1ctp++;else if(sb.ctpin==='team2')sb2ctp++;if(sb.ldrive==='team1')sb1ld++;else if(sb.ldrive==='team2')sb2ld++;});
+  Object.values(sideBets).forEach(bet=>{if(bet.ctpin==='team1')sb1ctp++;else if(bet.ctpin==='team2')sb2ctp++;if(bet.ldrive==='team1')sb1ld++;else if(bet.ldrive==='team2')sb2ld++;});
   const noteCount=Object.keys(holeNotes).length;
   const fmtD=d=>(d===0?'E':d>0?`+${d}`:d);
   wrap.innerHTML=`<div class="recap-card">
@@ -1350,8 +1402,17 @@ async function savePrizes(){
 }
 
 function renderSetup(){
-  const setupVisible=document.getElementById('tab-setup')&&document.getElementById('tab-setup').style.display!=='none';
-  if(setupVisible)buildParInputs();
+  const setupEl=document.getElementById('tab-setup');
+  const setupVisible=setupEl&&setupEl.style.display!=='none';
+  const ae=document.activeElement;
+  if(setupVisible){
+    const parFocused=ae&&ae.classList.contains('par-input');
+    if(!parFocused)buildParInputs();
+    const playerFocused=ae&&ae.classList.contains('pinput');
+    if(playerFocused)return;
+  } else {
+    buildParInputs();
+  }
   ['team1','team2'].forEach(tid=>{
     const t=TEAMS[tid],card=document.getElementById(tid.replace('team','t')+'card'),pp=players[tid];
     if(!card)return;
@@ -1382,19 +1443,21 @@ async function savePlayerNames(tid){await saveSetting(tid+'_players',JSON.string
 // ── SCORE ENTRY ──
 function cellClick(el){
   if(!myTeam||myTeam==='watch')return;
+  if(roundLocked&&!adminMode)return;
   const tid=el.dataset.team;if(tid!==myTeam)return;
   if(editingCell)commitEdit();
   const hole=parseInt(el.dataset.hole),cur=scores[tid]?.[hole]||'';
-  el.outerHTML=`<input class="sinput" id="ai" type="number" min="1" max="15" value="${cur}" data-team="${tid}" data-hole="${hole}" onblur="commitEdit()" onkeydown="ikey(event)"/>`;
-  const inp=document.getElementById('ai');inp.focus();inp.select();editingCell={tid,hole};
+  el.outerHTML=`<div id="step-${tid}-${hole}" class="stepper-group"><button class="step-btn" onclick="stepScore('${tid}',${hole},-1)">−</button><span class="step-val" onclick="editStepVal('${tid}',${hole})">${cur||'·'}</span><button class="step-btn" onclick="stepScore('${tid}',${hole},1)">+</button></div>`;
 }
 function ikey(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();commitEdit();}if(e.key==='Escape'){editingCell=null;renderTeamRows();renderWinnerRow();renderBanner();}}
 async function commitEdit(){
   const inp=document.getElementById('ai');if(!inp){editingCell=null;return;}
   const tid=inp.dataset.team,hole=parseInt(inp.dataset.hole),val=parseInt(inp.value);
+  const prev=scores[tid]?.[hole]||null;
   editingCell=null;
-  if(!isNaN(val)&&val>0){scores[tid][hole]=val;await upsertScore(tid,hole,val);}
+  if(!isNaN(val)&&val>0){lastAction={tid,hole,prev};scores[tid][hole]=val;await upsertScore(tid,hole,val);showUndoBtn();}
   renderTeamRows();renderWinnerRow();renderBanner();renderMomentum();renderRecap();
+  checkAllScored();
 }
 
 // ── PRIZE ──
@@ -1412,7 +1475,11 @@ function openPrize(){
 }
 function closePrize(){document.getElementById('prize-overlay').classList.add('hidden');document.getElementById('confwrap').innerHTML='';}
 function initScratch(){
-  const area=document.getElementById('scratch-area'),canvas=document.getElementById('scratch-canvas');
+  const area=document.getElementById('scratch-area');
+  let canvas=document.getElementById('scratch-canvas');
+  const fresh=canvas.cloneNode(false);
+  canvas.parentNode.replaceChild(fresh,canvas);
+  canvas=fresh;
   canvas.width=area.offsetWidth;canvas.height=area.offsetHeight;
   const ctx=canvas.getContext('2d');
   const grad=ctx.createLinearGradient(0,0,canvas.width,canvas.height);
@@ -1512,13 +1579,149 @@ function pickTeam(tid){myTeam=tid;localStorage.setItem('kk_myteam',tid);renderAl
 function switchTeam(){myTeam=null;localStorage.removeItem('kk_myteam');renderAll();}
 function swTab(name,btn){
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-  ['scorecard','momentum','trash','sidebets','photos','history','recap','setup'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===name?'block':'none';});
+  ['scorecard','momentum','trash','sidebets','photos','history','recap','setup','liveentry'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===name?'block':'none';});
   if(name==='momentum')setTimeout(drawSwingChart,50);
   if(name==='recap')renderRecap();
   if(name==='setup')renderSetup();
   if(name==='photos'){buildPhotoHoleSel();renderPhotos();}
+  if(name==='liveentry')renderLiveEntry();
 }
 
+
+// ── STEPPER SCORE ENTRY ──
+async function stepScore(tid,hole,delta){
+  if(roundLocked&&!adminMode)return;
+  const cur=scores[tid]?.[hole]||0;
+  const nv=Math.max(1,Math.min(15,(cur||0)+delta));
+  lastAction={tid,hole,prev:cur||null};
+  scores[tid][hole]=nv;
+  await upsertScore(tid,hole,nv);
+  const group=document.getElementById(`step-${tid}-${hole}`);
+  if(group){const val=group.querySelector('.step-val');if(val)val.textContent=nv;}
+  else{renderTeamRows();renderWinnerRow();renderBanner();}
+  renderMomentum();renderRecap();checkAllScored();showUndoBtn();
+}
+function editStepVal(tid,hole){
+  const group=document.getElementById(`step-${tid}-${hole}`);if(!group)return;
+  const cur=scores[tid]?.[hole]||'';
+  group.outerHTML=`<input class="sinput" id="ai" type="number" min="1" max="15" value="${cur}" data-team="${tid}" data-hole="${hole}" onblur="commitEdit()" onkeydown="ikey(event)"/>`;
+  const inp=document.getElementById('ai');if(inp){inp.focus();inp.select();}
+  editingCell={tid,hole};
+}
+
+// ── ROUND LOCK ──
+function checkAllScored(){
+  const allDone=PAR.every((_,h)=>scores.team1?.[h]&&scores.team2?.[h]);
+  const lockBtn=document.getElementById('lock-btn');
+  if(lockBtn)lockBtn.style.display=allDone&&!roundLocked?'block':'none';
+  const lockBar=document.getElementById('lock-bar');
+  if(lockBar)lockBar.style.display=roundLocked?'flex':'none';
+}
+function lockRound(){
+  roundLocked=true;localStorage.setItem('kk_locked','1');
+  checkAllScored();renderTeamRows();
+  showToast('Round locked 🔒');
+  const btn=Array.from(document.querySelectorAll('.tbtn')).find(b=>b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'recap'"));
+  if(btn)swTab('recap',btn);
+}
+function unlockRound(){
+  if(!adminMode){showPinModal();return;}
+  roundLocked=false;localStorage.removeItem('kk_locked');
+  checkAllScored();renderTeamRows();showToast('Round unlocked');
+}
+
+// ── UNDO ──
+function showUndoBtn(){
+  const btn=document.getElementById('undo-btn');if(!btn)return;
+  btn.style.display='block';
+  if(undoTimer)clearTimeout(undoTimer);
+  undoTimer=setTimeout(()=>{btn.style.display='none';},10000);
+}
+async function undoLast(){
+  if(!lastAction)return;
+  const{tid,hole,prev}=lastAction;lastAction=null;
+  const btn=document.getElementById('undo-btn');if(btn)btn.style.display='none';
+  if(undoTimer)clearTimeout(undoTimer);
+  if(prev===null||prev===undefined){
+    await sb.from('scores').delete().match({team_id:tid,hole});
+    if(scores[tid])delete scores[tid][hole];
+  }else{scores[tid][hole]=prev;await upsertScore(tid,hole,prev);}
+  renderTeamRows();renderWinnerRow();renderBanner();renderMomentum();renderRecap();
+  checkAllScored();showToast('Undone ↩');
+}
+
+// ── LIVE ENTRY ──
+function renderLiveEntry(){
+  if(!myTeam||myTeam==='watch'){
+    document.getElementById('le-wrap').innerHTML='<div style="text-align:center;padding:40px;color:var(--mu);">Pick your team first to use Live Entry.</div>';
+    return;
+  }
+  const hole=currentLiveHole,par=PAR[hole],cur=scores[myTeam]?.[hole]||0;
+  const progress=PAR.map((_,h)=>{
+    const scored=!!(scores[myTeam]?.[h]),isCur=h===hole;
+    return`<div style="width:20px;height:20px;border-radius:50%;background:${isCur?'var(--gb)':scored?'#bbf7d0':'var(--bg2)'};border:1px solid ${isCur?'var(--gl)':scored?'#16a34a':'var(--bor)'};font-size:9px;display:flex;align-items:center;justify-content:center;color:${isCur?'#fff':scored?'#15803d':'var(--mu)'}">${h+1}</div>`;
+  }).join('');
+  document.getElementById('le-wrap').innerHTML=`<div style="padding:20px;text-align:center;max-width:400px;margin:0 auto;">
+    <div style="font-size:12px;color:var(--mu);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Hole ${hole+1} of 18</div>
+    <div style="font-family:'Playfair Display',serif;font-size:28px;font-weight:900;color:var(--tx);margin-bottom:4px;">${TEAMS[myTeam].emoji} ${names[myTeam]}</div>
+    <div style="font-size:13px;color:var(--mu);margin-bottom:24px;">Par ${par}${courseName?' · '+courseName:''}</div>
+    <div style="font-size:96px;font-weight:900;font-family:'Playfair Display',serif;color:var(--tx);line-height:1;margin-bottom:24px;">${cur||'—'}</div>
+    <div style="display:flex;gap:16px;justify-content:center;margin-bottom:28px;">
+      <button onclick="leStep(-1)" style="width:80px;height:80px;font-size:40px;border-radius:50%;background:var(--bg2);border:2px solid var(--bor);cursor:pointer;font-family:inherit;">−</button>
+      <button onclick="leStep(1)" style="width:80px;height:80px;font-size:40px;border-radius:50%;background:var(--gb);border:none;color:#fff;cursor:pointer;font-family:inherit;">+</button>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;">
+      ${hole>0?`<button onclick="lePrev()" style="padding:12px 24px;background:var(--bg2);border:1px solid var(--bor);border-radius:9px;font-family:inherit;font-size:14px;cursor:pointer;color:var(--mu);">← Back</button>`:''}
+      <button onclick="leNext()" style="padding:12px 24px;background:var(--gb);border:none;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#fff;">${hole<17?'Next →':'🏁 Finish'}</button>
+    </div>
+    <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">${progress}</div>
+  </div>`;
+}
+async function leStep(delta){
+  if(roundLocked&&!adminMode)return;
+  const hole=currentLiveHole,cur=scores[myTeam]?.[hole]||0;
+  const nv=Math.max(1,Math.min(15,(cur||0)+delta));
+  lastAction={tid:myTeam,hole,prev:cur||null};
+  scores[myTeam][hole]=nv;
+  await upsertScore(myTeam,hole,nv);
+  showUndoBtn();renderLiveEntry();
+}
+function leNext(){
+  if(currentLiveHole<17){currentLiveHole++;renderLiveEntry();}
+  else{
+    const btn=Array.from(document.querySelectorAll('.tbtn')).find(b=>b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'recap'"));
+    if(btn)swTab('recap',btn);
+    showToast('Round complete! 🏁');
+  }
+}
+function lePrev(){if(currentLiveHole>0){currentLiveHole--;renderLiveEntry();}}
+
+// ── HOST PIN ──
+function showPinModal(){
+  const existing=localStorage.getItem('kk_pin');
+  document.getElementById('pin-msg').textContent=existing?'Enter your PIN to toggle admin mode.':'Set a new 4-digit PIN.';
+  document.getElementById('pin-input').value='';
+  document.getElementById('pin-overlay').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('pin-input').focus(),100);
+}
+function closePinModal(){document.getElementById('pin-overlay').classList.add('hidden');}
+function checkPin(){
+  const val=document.getElementById('pin-input').value.trim();
+  if(val.length!==4||!/^\d{4}$/.test(val)){showToast('Enter a 4-digit PIN','e');return;}
+  const existing=localStorage.getItem('kk_pin');
+  if(!existing){localStorage.setItem('kk_pin',val);adminMode=true;closePinModal();updateAdminUI();showToast('PIN set 🔓 Admin ON');}
+  else if(val===existing){adminMode=!adminMode;closePinModal();updateAdminUI();showToast(adminMode?'Admin ON 🔓':'Admin OFF 🔒');}
+  else{showToast('Wrong PIN','e');document.getElementById('pin-input').value='';}
+}
+function updateAdminUI(){
+  const btn=document.getElementById('pin-btn');
+  if(btn)btn.style.background=adminMode?'rgba(220,38,38,.3)':'rgba(255,255,255,.15)';
+  checkAllScored();
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 window.addEventListener('load',init);
 window.addEventListener('resize',()=>{if(document.getElementById('tab-momentum')&&document.getElementById('tab-momentum').style.display!=='none')drawSwingChart();});
 </script>
