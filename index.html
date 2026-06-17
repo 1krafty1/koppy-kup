@@ -462,6 +462,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <div class="series-record" id="series-record">—</div>
         <div class="series-names" id="series-names">Loading...</div>
       </div>
+      <div class="sec-title">🏆 Most Winning Players</div>
+      <div id="champ-leaderboard"></div>
       <div class="sec-title">Year by Year</div>
       <div id="hist-form-area"></div>
       <div id="hist-years"></div>
@@ -638,6 +640,7 @@ let scores={team1:{},team2:{}};
 let names={team1:'Team 1',team2:'Team 2'};
 let players={team1:['','','',''],team2:['','','','']};
 let trashMsgs=[],sideBets={},histYears=[],photos=[],holeNotes={};
+let histRosters={};
 let myTeam=localStorage.getItem('kk_myteam')||null;
 let ttSender=localStorage.getItem('kk_ttsender')||null;
 let editingCell=null,scratchDone=false;
@@ -701,6 +704,7 @@ async function loadAll(){
       if(r.key==='course_name')courseName=r.value;
       if(r.key==='course_par')try{const p=JSON.parse(r.value);if(Array.isArray(p)&&p.length===18)PAR=p;}catch{}
       if(r.key==='custom_prizes')try{const cp=JSON.parse(r.value);if(Array.isArray(cp)&&cp.length)PRIZES=cp;}catch{}
+      if(r.key==='history_rosters')try{const hr=JSON.parse(r.value);if(hr&&typeof hr==='object')histRosters=hr;}catch{}
     });}
     if(hy)histYears=hy;
     document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
@@ -1090,16 +1094,22 @@ function renderHistory(){
   let t1w=0,t2w=0;histYears.forEach(y=>{if(y.winner==='team1')t1w++;else if(y.winner==='team2')t2w++;});
   document.getElementById('series-record').textContent=`${t1w} – ${t2w}`;
   document.getElementById('series-names').textContent=`${TEAMS.team1.emoji} ${names.team1}  vs  ${TEAMS.team2.emoji} ${names.team2}`;
+  renderChampLeaderboard();
   if(!histYears.length){yearsEl.innerHTML='<div style="text-align:center;color:var(--mu);font-size:13px;padding:20px;">No past years yet.</div>';return;}
   yearsEl.innerHTML=histYears.slice().reverse().map(y=>{
     const winner=y.winner?TEAMS[y.winner]:null;
     const d1=y.score1&&y.par1?(y.score1-y.par1):null;
     const d2=y.score2&&y.par2?(y.score2-y.par2):null;
     const fmtD=d=>(d===null?'—':d===0?'E':d>0?`+${d}`:d);
+    const ros=histRosters[y.year]||{};
+    const rHtml=tid=>{const p=(ros[tid]||[]).filter(Boolean);return p.length?`<div style="font-size:9px;color:rgba(0,0,0,.4);margin-top:3px;line-height:1.3;">${escHtml(p.join(' · '))}</div>`:'';};
     return`<div class="hist-year-card">
       <div class="hist-year-hdr">
         <span class="hist-year-title">${y.year}</span>
-        ${winner?`<span class="hist-champion" style="color:${winner.color}">${winner.emoji} ${y.winner==='team1'?names.team1:names.team2} Won</span>`:'<span class="hist-champion" style="color:var(--mu)">No winner</span>'}
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${winner?`<span class="hist-champion" style="color:${winner.color}">${winner.emoji} ${y.winner==='team1'?names.team1:names.team2} Won</span>`:'<span class="hist-champion" style="color:var(--mu)">No winner</span>'}
+          <button onclick="showHistForm(${y.year})" title="Edit year / players" style="background:var(--bg2);border:1px solid var(--bor);border-radius:6px;color:var(--mu);font-size:11px;padding:3px 8px;cursor:pointer;font-family:inherit;">✏️</button>
+        </div>
       </div>
       ${y.course_name?`<div class="hist-course-name">📍 ${y.course_name}</div>`:''}
       <div class="hist-scores">
@@ -1107,11 +1117,13 @@ function renderHistory(){
           <div class="hist-tn" style="color:${TEAMS.team1.color}">${TEAMS.team1.emoji} ${names.team1}</div>
           <div class="hist-sc">${y.score1||'—'}</div>
           <div class="hist-par" style="color:${d1<0?'#16a34a':d1>0?'#dc2626':'#6b7280'}">${y.par1?`${fmtD(d1)} · par ${y.par1}`:'—'}</div>
+          ${rHtml('team1')}
         </div>
         <div class="hist-team-score" style="border:1px solid ${TEAMS.team2.color}30">
           <div class="hist-tn" style="color:${TEAMS.team2.color}">${TEAMS.team2.emoji} ${names.team2}</div>
           <div class="hist-sc">${y.score2||'—'}</div>
           <div class="hist-par" style="color:${d2<0?'#16a34a':d2>0?'#dc2626':'#6b7280'}">${y.par2?`${fmtD(d2)} · par ${y.par2}`:'—'}</div>
+          ${rHtml('team2')}
         </div>
       </div>
       ${y.notes?`<div style="font-size:12px;color:var(--mu);font-style:italic;margin-top:4px;">"${escHtml(y.notes)}"</div>`:''}
@@ -1119,15 +1131,67 @@ function renderHistory(){
   }).join('');
 }
 
-function showHistForm(){
+function renderChampLeaderboard(){
+  const el=document.getElementById('champ-leaderboard');if(!el)return;
+  const norm=s=>s.trim().toLowerCase();
+  const stats={};
+  const bump=(name,isWin,year)=>{
+    const k=norm(name);if(!k)return;
+    if(!stats[k])stats[k]={name:name.trim(),wins:0,plays:0,years:[]};
+    stats[k].plays++;stats[k].years.push(year);
+    if(isWin)stats[k].wins++;
+  };
+  histYears.forEach(y=>{
+    const r=histRosters[y.year];if(!r)return;
+    ['team1','team2'].forEach(tid=>{
+      (r[tid]||[]).forEach(n=>{if(n&&n.trim())bump(n,y.winner===tid,y.year);});
+    });
+  });
+  const rows=Object.values(stats).filter(s=>s.plays>0)
+    .sort((a,b)=>b.wins-a.wins||b.plays-a.plays||a.name.localeCompare(b.name));
+  if(!rows.length){
+    el.innerHTML=`<div style="background:#fff;border:1px dashed var(--bor);border-radius:12px;padding:16px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6;margin-bottom:16px;">No player rosters recorded yet.<br/>Tap ✏️ on a year below (or fill in players when adding one) to see who's on the most winning teams.</div>`;
+    return;
+  }
+  const maxWins=Math.max(...rows.map(r=>r.wins),1);
+  const medal=i=>['🥇','🥈','🥉'][i]||`<span style="color:var(--mu)">${i+1}</span>`;
+  el.innerHTML=`<div style="background:#fff;border:1px solid var(--bor);border-radius:12px;padding:4px 0;margin-bottom:16px;box-shadow:var(--shadow);">${
+    rows.map((r,i)=>{
+      const pct=r.plays?Math.round(r.wins/r.plays*100):0;
+      const barW=Math.round(r.wins/maxWins*100);
+      const top=i===0&&r.wins>0;
+      return`<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;${i<rows.length-1?'border-bottom:1px solid var(--bg2);':''}">
+        <span style="font-size:15px;width:24px;text-align:center;flex-shrink:0;">${medal(i)}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+            <span style="font-size:14px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(r.name)}</span>
+            <span style="font-size:11px;color:var(--mu);flex-shrink:0;">🏆 ${r.wins} · ${r.plays} yr${r.plays!==1?'s':''} · ${pct}%</span>
+          </div>
+          <div style="height:6px;background:var(--bg2);border-radius:3px;margin-top:4px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${top?'linear-gradient(90deg,#d97706,#f59e0b)':'#16a34a'};border-radius:3px;"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')
+  }</div>`;
+}
+
+function showHistForm(editYear){
+  const ex=editYear!=null?histYears.find(h=>String(h.year)===String(editYear)):null;
+  const ros=editYear!=null?(histRosters[editYear]||{}):{};
+  const rv=tid=>(ros[tid]&&ros[tid].length)?escHtml(ros[tid].filter(Boolean).join(', ')):'';
+  const ph1=escHtml((players.team1||[]).filter(Boolean).join(', '))||'Names, comma-separated';
+  const ph2=escHtml((players.team2||[]).filter(Boolean).join(', '))||'Names, comma-separated';
   document.getElementById('hist-form-area').innerHTML=`<div class="hist-form">
-    <div class="hf-title">Add Past Year</div>
-    <div class="hf-row"><span class="hf-label">Year</span><input class="hf-input" id="hf-year" type="number" placeholder="e.g. 2023" min="2000" max="2099"/></div>
-    <div class="hf-row"><span class="hf-label">Course</span><input class="hf-input" id="hf-course" type="text" placeholder="Course name"/></div>
-    <div class="hf-row"><span class="hf-label">Course Par</span><input class="hf-input" id="hf-par" type="number" placeholder="e.g. 72"/></div>
-    <div class="hf-row"><span class="hf-label" style="color:${TEAMS.team1.color}">${TEAMS.team1.emoji} Score</span><input class="hf-input" id="hf-s1" type="number" placeholder="Total strokes"/></div>
-    <div class="hf-row"><span class="hf-label" style="color:${TEAMS.team2.color}">${TEAMS.team2.emoji} Score</span><input class="hf-input" id="hf-s2" type="number" placeholder="Total strokes"/></div>
-    <div class="hf-row"><span class="hf-label">Notes</span><input class="hf-input" id="hf-notes" type="text" placeholder="Optional quote or memory"/></div>
+    <div class="hf-title">${ex?'Edit '+ex.year:'Add Past Year'}</div>
+    <div class="hf-row"><span class="hf-label">Year</span><input class="hf-input" id="hf-year" type="number" placeholder="e.g. 2023" min="2000" max="2099" value="${ex?ex.year:''}" ${ex?'readonly style="opacity:.6"':''}/></div>
+    <div class="hf-row"><span class="hf-label">Course</span><input class="hf-input" id="hf-course" type="text" placeholder="Course name" value="${ex&&ex.course_name?escHtml(ex.course_name):''}"/></div>
+    <div class="hf-row"><span class="hf-label">Course Par</span><input class="hf-input" id="hf-par" type="number" placeholder="e.g. 72" value="${ex&&ex.par1?ex.par1:''}"/></div>
+    <div class="hf-row"><span class="hf-label" style="color:${TEAMS.team1.color}">${TEAMS.team1.emoji} Score</span><input class="hf-input" id="hf-s1" type="number" placeholder="Total strokes" value="${ex&&ex.score1?ex.score1:''}"/></div>
+    <div class="hf-row"><span class="hf-label" style="color:${TEAMS.team1.color}">${TEAMS.team1.emoji} Players</span><input class="hf-input" id="hf-p1" type="text" placeholder="${ph1}" value="${rv('team1')}"/></div>
+    <div class="hf-row"><span class="hf-label" style="color:${TEAMS.team2.color}">${TEAMS.team2.emoji} Score</span><input class="hf-input" id="hf-s2" type="number" placeholder="Total strokes" value="${ex&&ex.score2?ex.score2:''}"/></div>
+    <div class="hf-row"><span class="hf-label" style="color:${TEAMS.team2.color}">${TEAMS.team2.emoji} Players</span><input class="hf-input" id="hf-p2" type="text" placeholder="${ph2}" value="${rv('team2')}"/></div>
+    <div class="hf-row"><span class="hf-label">Notes</span><input class="hf-input" id="hf-notes" type="text" placeholder="Optional quote or memory" value="${ex&&ex.notes?escHtml(ex.notes):''}"/></div>
     <div style="display:flex;gap:8px;margin-top:4px;">
       <button class="hf-save" onclick="saveHistYear()">Save Year</button>
       <button class="hf-cancel" onclick="document.getElementById('hist-form-area').innerHTML=''">Cancel</button>
@@ -1141,9 +1205,14 @@ async function saveHistYear(){
   const s1=parseInt(document.getElementById('hf-s1').value)||null;
   const s2=parseInt(document.getElementById('hf-s2').value)||null;
   const notes=document.getElementById('hf-notes').value.trim();
+  const parseRoster=id=>(document.getElementById(id).value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const p1=parseRoster('hf-p1'),p2=parseRoster('hf-p2');
   if(!year){showToast('Enter a year','e');return;}
   const winner=s1&&s2?(s1<s2?'team1':s2<s1?'team2':'tie'):null;
   await sb.from('history').upsert({year,course_name:course,score1:s1,score2:s2,par1:par,par2:par,winner,notes},{onConflict:'year'});
+  if(p1.length||p2.length)histRosters[year]={team1:p1,team2:p2};
+  else delete histRosters[year];
+  await saveSetting('history_rosters',JSON.stringify(histRosters));
   document.getElementById('hist-form-area').innerHTML='';
   showToast('Year saved ✓');
   await loadAll();
@@ -1542,6 +1611,8 @@ async function executeClear(){
     const winner=s1&&s2?(s1<s2?'team1':s2<s1?'team2':'tie'):null;
     try{
       await sb.from('history').upsert({year,course_name:course,score1:s1,score2:s2,par1:par,par2:par,winner,notes:''},{onConflict:'year'});
+      const r1=(players.team1||[]).filter(Boolean),r2=(players.team2||[]).filter(Boolean);
+      if(r1.length||r2.length){histRosters[year]={team1:r1,team2:r2};await saveSetting('history_rosters',JSON.stringify(histRosters));}
       showToast('Round saved to History ✓');
     }catch(e){showToast('History save failed','e');}
   }
