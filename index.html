@@ -342,6 +342,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     </div>
   </div>
 
+  <div id="live-status" class="atbar" style="justify-content:center;display:none;"><span id="live-status-txt"></span></div>
+
   <div id="tpick" class="tpick">
     <p>WHO'S ENTERING SCORES?</p>
     <div class="pbts">
@@ -406,6 +408,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <!-- MOMENTUM -->
   <div id="tab-momentum" style="display:none;">
     <div class="momwrap">
+      <div class="sec-title">Match Play Bets</div>
+      <div id="nassau-grid" class="mom-grid"></div>
+      <div id="skins-box" style="margin-bottom:20px;"></div>
       <div class="sec-title">Momentum Tracker</div>
       <div class="mom-grid" id="mom-grid"></div>
       <div class="sec-title">Hole-by-Hole Control</div>
@@ -462,6 +467,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <div class="series-record" id="series-record">—</div>
         <div class="series-names" id="series-names">Loading...</div>
       </div>
+      <div id="series-stats"></div>
       <div class="sec-title">🏆 Most Winning Players</div>
       <div id="champ-leaderboard"></div>
       <div class="sec-title">Year by Year</div>
@@ -497,6 +503,20 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
         <p style="font-size:12px;color:var(--mu);margin-bottom:12px;">Enter the actual stakes for this year's round. One prize is picked randomly at reveal.</p>
         <div id="prize-inputs"></div>
         <button class="prize-save-btn" onclick="savePrizes()">💾 Save Prizes</button>
+      </div>
+
+      <div class="stitle">Handicaps</div>
+      <div class="course-card">
+        <p style="font-size:12px;color:var(--mu);margin-bottom:12px;">Give a team strokes to even things out. Strokes go to the hardest holes first (lowest stroke index). Hole match-ups, Nassau &amp; skins use net scores; stroke totals stay gross.</p>
+        <div style="display:flex;gap:10px;margin-bottom:14px;">
+          <div style="flex:1;"><div class="plbl" style="color:#16a34a;">🦅 <span id="hc-t1-lbl">Team 1</span> strokes</div><input class="par-input" id="hc-team1" type="number" min="0" max="36" value="0" style="width:100%;"/></div>
+          <div style="flex:1;"><div class="plbl" style="color:#dc2626;">🔥 <span id="hc-t2-lbl">Team 2</span> strokes</div><input class="par-input" id="hc-team2" type="number" min="0" max="36" value="0" style="width:100%;"/></div>
+        </div>
+        <div class="plbl">Stroke Index (1 = hardest hole)</div>
+        <div class="par-grid" id="si-grid-front"></div>
+        <div class="plbl" style="margin-top:10px;">Back Nine</div>
+        <div class="par-grid" id="si-grid-back"></div>
+        <button class="course-save-btn" onclick="saveHandicaps()">💾 Save Handicaps</button>
       </div>
 
       <div class="stitle">Teams &amp; Players</div>
@@ -641,6 +661,10 @@ let names={team1:'Team 1',team2:'Team 2'};
 let players={team1:['','','',''],team2:['','','','']};
 let trashMsgs=[],sideBets={},histYears=[],photos=[],holeNotes={};
 let histRosters={};
+let handicaps={team1:0,team2:0};
+let strokeIndex=Array.from({length:18},(_,i)=>i+1);
+let sidebetPlayers={};
+let offlineQueue=JSON.parse(localStorage.getItem('kk_queue')||'[]');
 let myTeam=localStorage.getItem('kk_myteam')||null;
 let ttSender=localStorage.getItem('kk_ttsender')||null;
 let editingCell=null,scratchDone=false;
@@ -674,6 +698,7 @@ async function init(){
   await loadAll();
   renderTeamPicker();
   buildParInputs();
+  buildHandicapInputs();
   buildPrizeInputs();
   setInterval(loadAll,15000);
   sb.channel('kk')
@@ -690,6 +715,7 @@ async function init(){
 // ── LOAD ALL ──
 async function loadAll(){
   try{
+    flushQueue();
     const[{data:sd},{data:st},{data:hy}]=await Promise.all([
       sb.from('scores').select('*'),
       sb.from('settings').select('*'),
@@ -705,6 +731,9 @@ async function loadAll(){
       if(r.key==='course_par')try{const p=JSON.parse(r.value);if(Array.isArray(p)&&p.length===18)PAR=p;}catch{}
       if(r.key==='custom_prizes')try{const cp=JSON.parse(r.value);if(Array.isArray(cp)&&cp.length)PRIZES=cp;}catch{}
       if(r.key==='history_rosters')try{const hr=JSON.parse(r.value);if(hr&&typeof hr==='object')histRosters=hr;}catch{}
+      if(r.key==='handicaps')try{const h=JSON.parse(r.value);if(h&&typeof h==='object')handicaps={team1:+h.team1||0,team2:+h.team2||0};}catch{}
+      if(r.key==='stroke_index')try{const si=JSON.parse(r.value);if(Array.isArray(si)&&si.length===18)strokeIndex=si;}catch{}
+      if(r.key==='sidebet_players')try{const sp=JSON.parse(r.value);if(sp&&typeof sp==='object')sidebetPlayers=sp;}catch{}
     });}
     if(hy)histYears=hy;
     document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
@@ -731,8 +760,30 @@ async function loadNotes(){
 }
 
 async function upsertScore(tid,hole,val){
-  await sb.from('scores').upsert({team_id:tid,hole,score:val},{onConflict:'team_id,hole'});
-  document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
+  try{
+    const{error}=await sb.from('scores').upsert({team_id:tid,hole,score:val},{onConflict:'team_id,hole'});
+    if(error)throw error;
+    document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
+    flushQueue();
+  }catch(e){
+    queueSave({tid,hole,score:val});
+    document.getElementById('sync-time').textContent=`⚠️ Offline — ${offlineQueue.length} change${offlineQueue.length!==1?'s':''} queued`;
+  }
+}
+function queueSave(op){
+  offlineQueue=offlineQueue.filter(o=>!(o.tid===op.tid&&o.hole===op.hole));
+  offlineQueue.push(op);
+  localStorage.setItem('kk_queue',JSON.stringify(offlineQueue));
+}
+async function flushQueue(){
+  if(!offlineQueue.length||!sb)return;
+  const q=offlineQueue.slice();offlineQueue=[];localStorage.setItem('kk_queue','[]');
+  for(const op of q){
+    try{const{error}=await sb.from('scores').upsert({team_id:op.tid,hole:op.hole,score:op.score},{onConflict:'team_id,hole'});if(error)throw error;}
+    catch(e){offlineQueue.push(op);}
+  }
+  localStorage.setItem('kk_queue',JSON.stringify(offlineQueue));
+  if(offlineQueue.length)document.getElementById('sync-time').textContent=`⚠️ Offline — ${offlineQueue.length} queued`;
 }
 async function saveSetting(key,value){await sb.from('settings').upsert({key,value},{onConflict:'key'});}
 
@@ -771,7 +822,9 @@ function renderTeamRows(){
     PAR.forEach((par,hole)=>{
       const s=scores[tid]?.[hole],cls=scClass(s,par)+(ce?'':' ro'),w=holeWinner(hole);
       const mk=w===tid?`<div style="position:absolute;top:1px;right:2px;font-size:7px;color:${t.color}">▲</div>`:'';
-      h+=`<td style="padding:2px 1px;text-align:center;position:relative;">${mk}<div class="sc ${cls}" data-team="${tid}" data-hole="${hole}" onclick="cellClick(this)">${s||'·'}</div></td>`;
+      const st=strokesOn(tid,hole);
+      const sm=st>0?`<div style="position:absolute;top:0;left:2px;font-size:8px;line-height:1;color:${t.color}" title="${st} handicap stroke${st>1?'s':''}">${'•'.repeat(st)}</div>`:'';
+      h+=`<td style="padding:2px 1px;text-align:center;position:relative;">${mk}${sm}<div class="sc ${cls}" data-team="${tid}" data-hole="${hole}" onclick="cellClick(this)">${s||'·'}</div></td>`;
     });
     const f=front(tid),b=back(tid),tot=total(tid),{diff,count}=toPar(tid);
     const ps=count>0?(diff===0?'E':diff>0?`+${diff}`:diff):'—',pc=diff<0?'#16a34a':diff>0?'#dc2626':'#6b7280';
@@ -822,6 +875,16 @@ function renderBanner(){
   const mt=matchTally();
   document.getElementById('mtally').textContent=`${mt.t1}–${mt.t2}`;
   document.getElementById('mtied').textContent=`${mt.ties} tied`;
+  const played=PAR.filter((_,h)=>scores.team1?.[h]&&scores.team2?.[h]).length;
+  const ls=document.getElementById('live-status'),lst=document.getElementById('live-status-txt');
+  if(ls&&lst){
+    if(played>0){
+      const diff=mt.t1-mt.t2;
+      lst.textContent=diff===0?`⛳ Thru ${played} · All square`:
+        `⛳ Thru ${played} · ${TEAMS[diff>0?'team1':'team2'].emoji} ${names[diff>0?'team1':'team2']} leads by ${Math.abs(diff)}`;
+      ls.style.display='flex';
+    }else ls.style.display='none';
+  }
 }
 
 function renderTeamPicker(){
@@ -962,6 +1025,7 @@ function closeLightbox(){document.getElementById('lightbox').classList.add('hidd
 
 // ── MOMENTUM ──
 function renderMomentum(){
+  renderMatchBets();
   const last3=momentumFor(3),last6=momentumFor(6),last9=momentumFor(9);
   document.getElementById('mom-grid').innerHTML=[['Last 3',last3],['Last 6',last6],['Last 9',last9]].map(([lbl,m])=>{
     if(!m)return`<div class="mom-card"><div class="mom-label">${lbl} HOLES</div><div class="mom-val" style="color:var(--mu)">—</div><div class="mom-sub">No data</div></div>`;
@@ -977,6 +1041,27 @@ function renderMomentum(){
     return`<div class="hs" style="background:${bg};border:1px solid ${bc};color:${col}">${h+1}</div>`;
   }).join('');
   drawSwingChart();
+}
+function renderMatchBets(){
+  const ng=document.getElementById('nassau-grid');if(!ng)return;
+  const nz=nassauResults();
+  ng.innerHTML=[['Front 9',nz.front],['Back 9',nz.back],['Overall',nz.overall]].map(([lbl,m])=>{
+    const played=m.t1+m.t2;
+    const c=m.winner==='team1'?'#16a34a':m.winner==='team2'?'#dc2626':'#6b7280';
+    const nm=played===0?'—':m.winner==='tie'?'Tied':`${TEAMS[m.winner].emoji} ${names[m.winner]}`;
+    return`<div class="mom-card"><div class="mom-label">${lbl}</div><div class="mom-val" style="color:${c};font-size:15px;">${nm}</div><div class="mom-sub">${m.t1}–${m.t2} holes</div></div>`;
+  }).join('');
+  const sk=skinsResults(),skBox=document.getElementById('skins-box');
+  if(!skBox)return;
+  const anyDecided=sk.holes.some(x=>x.winner);
+  skBox.innerHTML=`<div class="mom-card" style="text-align:left;">
+    <div class="mom-label" style="margin-bottom:8px;">🩸 SKINS${sk.carry?` · ${sk.carry} carrying over`:''}</div>
+    <div style="display:flex;justify-content:space-around;margin-bottom:10px;">
+      <div style="text-align:center;"><div class="mom-val" style="color:#16a34a;">${sk.t1}</div><div class="mom-sub">${names.team1}</div></div>
+      <div style="text-align:center;"><div class="mom-val" style="color:#dc2626;">${sk.t2}</div><div class="mom-sub">${names.team2}</div></div>
+    </div>
+    ${anyDecided?`<div style="display:flex;flex-wrap:wrap;gap:3px;">${sk.holes.map(x=>{if(!x.winner)return'';const col=x.winner==='tie'?'#94a3b8':x.winner==='team1'?'#16a34a':'#dc2626';const bg=x.winner==='tie'?'rgba(0,0,0,.05)':x.winner==='team1'?'rgba(22,163,74,.15)':'rgba(220,38,38,.15)';return`<div class="hs" style="background:${bg};border:1px solid ${col};color:${col};position:relative;">${x.h+1}${x.val>1?`<span style="position:absolute;top:-5px;right:-3px;font-size:7px;background:#d97706;color:#fff;border-radius:6px;padding:0 3px;">${x.val}</span>`:''}</div>`;}).join('')}</div>`:`<div class="mom-sub" style="text-align:center;">Win a hole outright to take a skin. Ties carry over.</div>`}
+  </div>`;
 }
 function momentumFor(n){
   const played=[];
@@ -1069,23 +1154,50 @@ function ttKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendTrash(
 // ── SIDE BETS ──
 function renderSideBets(){
   const wrap=document.getElementById('sb-content');if(!wrap)return;
-  wrap.innerHTML=PAR.map((par,h)=>{
+  const tally=sideBetTally();
+  const king=tally.length?`<div class="sb-hole-card" style="border-color:#fde68a;background:#fffbeb;">
+    <div class="sb-hole-hdr"><span class="sb-hole-num" style="color:#d97706;">👑 Side Bet King</span><span class="sb-hole-par">${tally.length} player${tally.length!==1?'s':''}</span></div>
+    ${tally.slice(0,6).map((p,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;${i<Math.min(tally.length,6)-1?'border-bottom:1px solid #fef3c7;':''}"><span style="font-weight:${i===0?'700':'400'};color:var(--tx);">${i===0?'👑 ':`${i+1}. `}${escHtml(p.name)}</span><span style="color:var(--mu);font-size:12px;">🎯${p.ctpin} · 💪${p.ldrive} · <strong>${p.total}</strong></span></div>`).join('')}
+  </div>`:'';
+  wrap.innerHTML=king+PAR.map((par,h)=>{
     const sb2=sideBets[h]||{},ctpin=sb2.ctpin,ldrive=sb2.ldrive;
+    const sp=sidebetPlayers[h]||{};
     const wbtn=(field,curVal,tid)=>{
       const sel=curVal===tid,cls=sel?(tid==='team1'?'sel1':'sel2'):'';
       return`<button class="sb-wbtn ${cls}" onclick="setSideBet(${h},'${field}','${tid}')">${TEAMS[tid].emoji} ${names[tid]}</button>`;
     };
+    const playerRow=(field,selTeam,curName)=>{
+      if(!selTeam)return'';
+      const pl=players[selTeam].filter(p=>p.trim());
+      if(!pl.length)return'';
+      return`<div class="sb-row"><span class="sb-label" style="font-size:10px;opacity:.8;">↳ who?</span><div style="display:flex;gap:4px;flex-wrap:wrap;flex:1;">${pl.map(name=>{const sel=curName===name;return`<button class="sb-wbtn" style="flex:0 1 auto;padding:5px 9px;${sel?`background:${TEAMS[selTeam].color}22;border-color:${TEAMS[selTeam].color};color:${TEAMS[selTeam].color};font-weight:700;`:''}" onclick="setSideBetPlayer(${h},'${field}','${escJs(name)}')">${escHtml(name)}</button>`;}).join('')}</div></div>`;
+    };
     return`<div class="sb-hole-card">
       <div class="sb-hole-hdr"><span class="sb-hole-num">Hole ${h+1}</span><span class="sb-hole-par">Par ${par}</span></div>
       <div class="sb-row"><span class="sb-label">🎯 Closest Pin</span><div class="sb-winner-sel">${wbtn('ctpin',ctpin,'team1')}${wbtn('ctpin',ctpin,'team2')}</div></div>
+      ${playerRow('ctpin',ctpin,sp.ctpin)}
       <div class="sb-row"><span class="sb-label">💪 Long Drive</span><div class="sb-winner-sel">${wbtn('ldrive',ldrive,'team1')}${wbtn('ldrive',ldrive,'team2')}</div></div>
+      ${playerRow('ldrive',ldrive,sp.ldrive)}
     </div>`;
   }).join('');
 }
 async function setSideBet(hole,field,tid){
   const cur=sideBets[hole]||{};cur[field]=cur[field]===tid?null:tid;sideBets[hole]=cur;
+  // dropping or switching the team clears any stale player attribution for this bet
+  if(sidebetPlayers[hole]&&sidebetPlayers[hole][field]){
+    delete sidebetPlayers[hole][field];
+    if(!sidebetPlayers[hole].ctpin&&!sidebetPlayers[hole].ldrive)delete sidebetPlayers[hole];
+    saveSetting('sidebet_players',JSON.stringify(sidebetPlayers));
+  }
   renderSideBets();
   await sb.from('sidebets').upsert({hole,ctpin:cur.ctpin||null,ldrive:cur.ldrive||null},{onConflict:'hole'});
+}
+async function setSideBetPlayer(hole,field,name){
+  const cur=sidebetPlayers[hole]||{};
+  cur[field]=cur[field]===name?null:name;
+  if(!cur.ctpin&&!cur.ldrive)delete sidebetPlayers[hole];else sidebetPlayers[hole]=cur;
+  renderSideBets();
+  await saveSetting('sidebet_players',JSON.stringify(sidebetPlayers));
 }
 
 // ── HISTORY ──
@@ -1094,6 +1206,7 @@ function renderHistory(){
   let t1w=0,t2w=0;histYears.forEach(y=>{if(y.winner==='team1')t1w++;else if(y.winner==='team2')t2w++;});
   document.getElementById('series-record').textContent=`${t1w} – ${t2w}`;
   document.getElementById('series-names').textContent=`${TEAMS.team1.emoji} ${names.team1}  vs  ${TEAMS.team2.emoji} ${names.team2}`;
+  renderSeriesStats();
   renderChampLeaderboard();
   if(!histYears.length){yearsEl.innerHTML='<div style="text-align:center;color:var(--mu);font-size:13px;padding:20px;">No past years yet.</div>';return;}
   yearsEl.innerHTML=histYears.slice().reverse().map(y=>{
@@ -1131,6 +1244,35 @@ function renderHistory(){
   }).join('');
 }
 
+function seriesStats(){
+  const ys=histYears.slice().sort((a,b)=>a.year-b.year);
+  let streakTeam=null,streak=0,bestStreak=0,bestStreakTeam=null,blowout=null,closest=null;
+  ys.forEach(y=>{
+    if(y.winner==='team1'||y.winner==='team2'){
+      if(y.winner===streakTeam)streak++;else{streakTeam=y.winner;streak=1;}
+      if(streak>bestStreak){bestStreak=streak;bestStreakTeam=streakTeam;}
+    }else{streakTeam=null;streak=0;}
+    if(y.score1&&y.score2){
+      const d=Math.abs(y.score1-y.score2);
+      if(!blowout||d>blowout.d)blowout={d,year:y.year,winner:y.winner};
+      if(d>0&&(!closest||d<closest.d))closest={d,year:y.year,winner:y.winner};
+    }
+  });
+  return{bestStreak,bestStreakTeam,blowout,closest,curStreak:streak,lastWinner:streakTeam};
+}
+function renderSeriesStats(){
+  const el=document.getElementById('series-stats');if(!el)return;
+  if(!histYears.length){el.innerHTML='';return;}
+  const s=seriesStats();
+  const tn=t=>t?`${TEAMS[t].emoji} ${names[t]}`:'—';
+  const chip=(label,val,sub)=>`<div class="rstat" style="background:#fff;"><div class="rstat-val" style="font-size:17px;">${val}</div><div class="rstat-lbl">${label}</div>${sub?`<div style="font-size:9px;color:var(--mu);margin-top:2px;">${sub}</div>`:''}</div>`;
+  el.innerHTML=`<div class="recap-stats" style="margin-bottom:16px;">
+    ${chip('Longest Streak',s.bestStreak||'—',s.bestStreakTeam?`${tn(s.bestStreakTeam)} · ${s.bestStreak} yrs`:'')}
+    ${chip('Current Streak',s.curStreak||'—',s.lastWinner?tn(s.lastWinner):'none')}
+    ${chip('Biggest Blowout',s.blowout?`${s.blowout.d}`:'—',s.blowout?`${s.blowout.year} · ${tn(s.blowout.winner)}`:'')}
+    ${chip('Closest Match',s.closest?`${s.closest.d}`:'—',s.closest?`${s.closest.year} · ${tn(s.closest.winner)}`:'')}
+  </div>`;
+}
 function renderChampLeaderboard(){
   const el=document.getElementById('champ-leaderboard');if(!el)return;
   const norm=s=>s.trim().toLowerCase();
@@ -1225,7 +1367,9 @@ function renderRecap(){
   const{diff:d1}=toPar('team1'),{diff:d2}=toPar('team2');
   const holesPlayed=PAR.filter((_,h)=>scores.team1?.[h]||scores.team2?.[h]).length;
   if(!t1tot&&!t2tot){wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--mu);font-size:14px;">No scores yet — the recap builds as you play!</div>';return;}
-  const winner=t1tot&&t2tot?(t1tot<t2tot?'team1':t2tot<t1tot?'team2':'tie'):null;
+  const winner=champion();
+  const hasHcp=!!(handicaps.team1||handicaps.team2);
+  const theMvp=mvp();
   const wt=winner&&winner!=='tie'?TEAMS[winner]:null;
   let t1best=null,t2best=null;
   for(let h=0;h<18;h++){
@@ -1242,7 +1386,8 @@ function renderRecap(){
   wrap.innerHTML=`<div class="recap-card">
     <div class="recap-title">🏆 Koppy Kup Classic</div>
     <div class="recap-sub">${courseName?`📍 ${courseName} · `:''}${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})} · ${holesPlayed}/18 holes</div>
-    ${winner&&winner!=='tie'?`<div class="recap-winner-box" style="border-color:${wt.color}50"><span class="recap-trophy">🏆</span><div class="recap-winner-lbl">Champion</div><div class="recap-winner-name" style="color:${wt.color}">${wt.emoji} ${names[winner]}</div></div>`:winner==='tie'?`<div class="recap-winner-box"><span class="recap-trophy">🤝</span><div class="recap-winner-name" style="color:#d97706">Dead Heat!</div></div>`:''}
+    ${winner&&winner!=='tie'?`<div class="recap-winner-box" style="border-color:${wt.color}50"><span class="recap-trophy">🏆</span><div class="recap-winner-lbl">Champion${hasHcp?' · net':''}</div><div class="recap-winner-name" style="color:${wt.color}">${wt.emoji} ${names[winner]}</div></div>`:winner==='tie'?`<div class="recap-winner-box"><span class="recap-trophy">🤝</span><div class="recap-winner-name" style="color:#d97706">Dead Heat!</div></div>`:''}
+    ${theMvp?`<div class="recap-winner-box" style="background:#fffbeb;border-color:#fde68a;"><span class="recap-trophy" style="font-size:34px;">👑</span><div class="recap-winner-lbl" style="color:#d97706;">Player of the Day</div><div class="recap-winner-name" style="color:#d97706;">${escHtml(theMvp.name)}</div><div class="pwscore" style="margin-top:4px;">🎯 ${theMvp.ctpin} closest · 💪 ${theMvp.ldrive} long drive · ${theMvp.total} total</div></div>`:''}
     <div class="recap-stats">
       <div class="rstat"><div class="rstat-val" style="color:${TEAMS.team1.color}">${t1tot||'—'}</div><div class="rstat-lbl">${names.team1} Total</div></div>
       <div class="rstat"><div class="rstat-val" style="color:${TEAMS.team2.color}">${t2tot||'—'}</div><div class="rstat-lbl">${names.team2} Total</div></div>
@@ -1250,6 +1395,7 @@ function renderRecap(){
       <div class="rstat"><div class="rstat-val">${mt.t2}</div><div class="rstat-lbl">${names.team2} Holes Won</div></div>
       <div class="rstat"><div class="rstat-val" style="color:${d1<0?'#16a34a':d1>0?'#dc2626':'#6b7280'}">${t1tot?fmtD(d1):'—'}</div><div class="rstat-lbl">${names.team1} vs Par</div></div>
       <div class="rstat"><div class="rstat-val" style="color:${d2<0?'#16a34a':d2>0?'#dc2626':'#6b7280'}">${t2tot?fmtD(d2):'—'}</div><div class="rstat-lbl">${names.team2} vs Par</div></div>
+      ${hasHcp?`<div class="rstat"><div class="rstat-val" style="color:${TEAMS.team1.color}">${netTotal('team1')||'—'}</div><div class="rstat-lbl">${names.team1} Net</div></div><div class="rstat"><div class="rstat-val" style="color:${TEAMS.team2.color}">${netTotal('team2')||'—'}</div><div class="rstat-lbl">${names.team2} Net</div></div>`:''}
     </div>
     <div class="recap-moments">
       ${t1best!==null?`<div class="moment-row"><span class="moment-icon">${t1best.d<=-2?'🦅':t1best.d===-1?'🐦':'⭐'}</span><div><div class="moment-text">${names.team1}'s best hole</div><div class="moment-sub">Hole ${t1best.h+1} · ${t1best.s} strokes (${fmtD(t1best.d)})</div></div></div>`:''}
@@ -1259,7 +1405,9 @@ function renderRecap(){
       ${sb1ld+sb2ld>0?`<div class="moment-row"><span class="moment-icon">💪</span><div><div class="moment-text">Longest drive</div><div class="moment-sub">${names.team1}: ${sb1ld} · ${names.team2}: ${sb2ld}</div></div></div>`:''}
       ${photos.length>0?`<div class="moment-row"><span class="moment-icon">📸</span><div><div class="moment-text">${photos.length} hole photo${photos.length!==1?'s':''} taken</div><div class="moment-sub">Check the Photos tab for the gallery</div></div></div>`:''}
       ${noteCount>0?`<div class="moment-row"><span class="moment-icon">📝</span><div><div class="moment-text">${noteCount} hole note${noteCount!==1?'s':''} recorded</div><div class="moment-sub">${Object.entries(holeNotes).map(([h,n])=>`Hole ${parseInt(h)+1}: ${n.note}`).join(' · ')}</div></div></div>`:''}
-      ${trashMsgs.length>0?`<div class="moment-row"><span class="moment-icon">💬</span><div><div class="moment-text">${trashMsgs.length} trash talk messages</div><div class="moment-sub">Some things said today cannot be unsaid</div></div></div>`:''}
+      ${(()=>{const nz=nassauResults();if(!(nz.overall.t1+nz.overall.t2))return'';const f=m=>m.t1+m.t2===0?'—':m.winner==='tie'?'Tied':`${TEAMS[m.winner].emoji} ${names[m.winner]}`;return`<div class="moment-row"><span class="moment-icon">🎲</span><div><div class="moment-text">Nassau</div><div class="moment-sub">Front: ${f(nz.front)} · Back: ${f(nz.back)} · Overall: ${f(nz.overall)}</div></div></div>`;})()}
+      ${(()=>{const sk=skinsResults();if(!sk.t1&&!sk.t2)return'';return`<div class="moment-row"><span class="moment-icon">🩸</span><div><div class="moment-text">Skins</div><div class="moment-sub">${names.team1}: ${sk.t1} · ${names.team2}: ${sk.t2}${sk.carry?` · ${sk.carry} still carrying`:''}</div></div></div>`;})()}
+      ${theMvp?`<div class="moment-row"><span class="moment-icon">👑</span><div><div class="moment-text">Side Bet King: ${escHtml(theMvp.name)}</div><div class="moment-sub">${theMvp.total} side bet${theMvp.total!==1?'s':''} won</div></div></div>`:''}
     </div>
     <div class="export-btns">
       <button class="export-btn pdf" onclick="exportPDF()">📄 Download PDF</button>
@@ -1273,7 +1421,7 @@ function renderRecap(){
 function buildScorecardCanvas(){
   const canvas=document.createElement('canvas');
   const dpr=2;
-  const W=900,H=280;
+  const W=900,H=304;
   canvas.width=W*dpr;canvas.height=H*dpr;
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
 
@@ -1369,6 +1517,17 @@ function buildScorecardCanvas(){
     }
   });
 
+  // Footer: champion + player of the day
+  const fy=wy+22;
+  ctx.fillStyle='#fbfaf7';ctx.fillRect(0,fy,W,H-fy);
+  ctx.strokeStyle='#e2e8f0';ctx.beginPath();ctx.moveTo(0,fy);ctx.lineTo(W,fy);ctx.stroke();
+  const champ=champion(),hasHcp=!!(handicaps.team1||handicaps.team2);
+  ctx.textAlign='left';ctx.font='bold 12px sans-serif';
+  ctx.fillStyle=champ&&champ!=='tie'?TEAMS[champ].color:'#64748b';
+  ctx.fillText(champ&&champ!=='tie'?`🏆 Champion: ${names[champ]}${hasHcp?` (net ${netTotal(champ)})`:''}`:champ==='tie'?'🤝 Result: Tie':'⛳ Round in progress',8,fy+22);
+  const m=mvp();
+  if(m){ctx.textAlign='right';ctx.fillStyle='#d97706';ctx.font='bold 12px sans-serif';ctx.fillText(`👑 Player of the Day: ${m.name} (${m.total} bets)`,W-8,fy+22);}
+
   return canvas;
 }
 
@@ -1379,10 +1538,12 @@ async function exportPDF(){
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const canvas=buildScorecardCanvas();
     const imgData=canvas.toDataURL('image/png');
-    doc.addImage(imgData,'PNG',10,10,277,85);
+    const imgH=277*(canvas.height/canvas.width);
+    doc.addImage(imgData,'PNG',10,10,277,imgH);
+    const hasHcp=!!(handicaps.team1||handicaps.team2);
 
     // Add recap text
-    let y=105;
+    let y=14+imgH;
     doc.setFontSize(14);doc.setTextColor(21,128,61);
     doc.text('Round Summary',10,y);y+=8;
     doc.setFontSize(10);doc.setTextColor(50,50,50);
@@ -1400,6 +1561,24 @@ async function exportPDF(){
       noteEntries.forEach(([h,n])=>{
         doc.text(`Hole ${parseInt(h)+1}: ${n.note}`,10,y);y+=6;
       });
+    }
+
+    // Right column: bets & honors
+    let ry=14+imgH;const rx=150;
+    doc.setFontSize(14);doc.setTextColor(21,128,61);doc.text('Bets & Honors',rx,ry);ry+=8;
+    doc.setFontSize(10);doc.setTextColor(50,50,50);
+    if(hasHcp){doc.text(`Net total — ${names.team1}: ${netTotal('team1')||'—'} · ${names.team2}: ${netTotal('team2')||'—'}`,rx,ry);ry+=6;}
+    const fmtN=m=>m.t1+m.t2===0?'—':m.winner==='tie'?'Tie':names[m.winner];
+    const nz=nassauResults();
+    doc.text(`Nassau — Front: ${fmtN(nz.front)} · Back: ${fmtN(nz.back)} · Overall: ${fmtN(nz.overall)}`,rx,ry);ry+=6;
+    const sk=skinsResults();
+    doc.text(`Skins — ${names.team1}: ${sk.t1} · ${names.team2}: ${sk.t2}${sk.carry?` (+${sk.carry} carrying)`:''}`,rx,ry);ry+=6;
+    const m=mvp();
+    if(m){doc.text(`Player of the Day: ${m.name} (${m.total} side bets)`,rx,ry);ry+=7;}
+    const sbt=sideBetTally();
+    if(sbt.length){
+      doc.setFontSize(9);doc.setTextColor(120,120,120);
+      sbt.slice(0,6).forEach(p=>{doc.text(`• ${p.name}: ${p.total} won (CTP ${p.ctpin}, LD ${p.ldrive})`,rx,ry);ry+=5;});
     }
 
     doc.save('Koppy-Kup-Scorecard.pdf');
@@ -1421,8 +1600,9 @@ async function exportImage(){
 
 async function shareRecap(){
   const t1tot=total('team1'),t2tot=total('team2'),mt=matchTally();
-  const winner=t1tot&&t2tot?(t1tot<t2tot?names.team1:t2tot<t1tot?names.team2:'Tie'):null;
-  const txt=`🏆 Koppy Kup Classic${courseName?' — '+courseName:''}\n${new Date().toLocaleDateString()}\n\n${TEAMS.team1.emoji} ${names.team1}: ${t1tot||'—'}\n${TEAMS.team2.emoji} ${names.team2}: ${t2tot||'—'}\nHoles: ${mt.t1}–${mt.t2}${winner?`\n\n🏆 Winner: ${winner}`:''}`;
+  const w=champion(),winner=w&&w!=='tie'?names[w]:w==='tie'?'Tie':null;
+  const m=mvp();
+  const txt=`🏆 Koppy Kup Classic${courseName?' — '+courseName:''}\n${new Date().toLocaleDateString()}\n\n${TEAMS.team1.emoji} ${names.team1}: ${t1tot||'—'}\n${TEAMS.team2.emoji} ${names.team2}: ${t2tot||'—'}\nHoles: ${mt.t1}–${mt.t2}${winner?`\n\n🏆 Winner: ${winner}`:''}${m?`\n👑 Player of the Day: ${m.name}`:''}`;
   if(navigator.share)await navigator.share({title:'Koppy Kup Classic',text:txt});
   else{await navigator.clipboard.writeText(txt);showToast('Copied to clipboard!');}
 }
@@ -1452,6 +1632,23 @@ async function saveCourseSettings(){
   showToast('Course saved ✓');buildTable();renderAll();
 }
 
+function buildHandicapInputs(){
+  const f=document.getElementById('si-grid-front'),b=document.getElementById('si-grid-back');
+  if(!f||!b)return;
+  const mk=i=>`<div class="par-cell"><span class="par-hole-lbl">${i+1}</span><input class="par-input" id="si-${i}" type="number" min="1" max="18" value="${strokeIndex[i]}"/></div>`;
+  f.innerHTML=Array.from({length:9},(_,i)=>mk(i)).join('');
+  b.innerHTML=Array.from({length:9},(_,i)=>mk(i+9)).join('');
+  const t1=document.getElementById('hc-team1'),t2=document.getElementById('hc-team2');
+  if(t1)t1.value=handicaps.team1||0;if(t2)t2.value=handicaps.team2||0;
+  const l1=document.getElementById('hc-t1-lbl'),l2=document.getElementById('hc-t2-lbl');
+  if(l1)l1.textContent=names.team1;if(l2)l2.textContent=names.team2;
+}
+async function saveHandicaps(){
+  handicaps={team1:parseInt(document.getElementById('hc-team1').value)||0,team2:parseInt(document.getElementById('hc-team2').value)||0};
+  strokeIndex=Array.from({length:18},(_,i)=>parseInt(document.getElementById('si-'+i)?.value)||(i+1));
+  await Promise.all([saveSetting('handicaps',JSON.stringify(handicaps)),saveSetting('stroke_index',JSON.stringify(strokeIndex))]);
+  showToast('Handicaps saved ✓');buildTable();renderAll();
+}
 function buildPrizeInputs(){
   const wrap=document.getElementById('prize-inputs');if(!wrap)return;
   wrap.innerHTML=PRIZES.map((p,i)=>`
@@ -1476,11 +1673,11 @@ function renderSetup(){
   const ae=document.activeElement;
   if(setupVisible){
     const parFocused=ae&&ae.classList.contains('par-input');
-    if(!parFocused)buildParInputs();
+    if(!parFocused){buildParInputs();buildHandicapInputs();}
     const playerFocused=ae&&ae.classList.contains('pinput');
     if(playerFocused)return;
   } else {
-    buildParInputs();
+    buildParInputs();buildHandicapInputs();
   }
   ['team1','team2'].forEach(tid=>{
     const t=TEAMS[tid],card=document.getElementById(tid.replace('team','t')+'card'),pp=players[tid];
@@ -1526,11 +1723,11 @@ async function commitEdit(){
   editingCell=null;
   if(!isNaN(val)&&val>0){lastAction={tid,hole,prev};scores[tid][hole]=val;await upsertScore(tid,hole,val);showUndoBtn();}
   renderTeamRows();renderWinnerRow();renderBanner();renderMomentum();renderRecap();
-  checkAllScored();
+  checkAllScored();maybeCelebrate();
 }
 
 // ── PRIZE ──
-function getWinner(){const t1=total('team1'),t2=total('team2');if(!t1&&!t2)return null;if(t1&&t2){if(t1<t2)return'team1';if(t2<t1)return'team2';return'tie';}return null;}
+function getWinner(){return champion();}
 function openPrize(){
   const winner=getWinner(),prize=PRIZES[Math.floor(Math.random()*PRIZES.length)];
   const pt=typeof prize==='string'?prize:prize.text;
@@ -1630,7 +1827,9 @@ async function executeClear(){
       await sb.from('photos').delete().gte('hole',0);
       trashMsgs=[];photos=[];holeNotes={};
     }
-    scores={team1:{},team2:{}};sideBets={};
+    scores={team1:{},team2:{}};sideBets={};sidebetPlayers={};
+    await saveSetting('sidebet_players','{}');
+    localStorage.removeItem('kk_celebrated');
     showToast('Cleared ✓');
     renderTeamRows();renderWinnerRow();renderNoteRow();renderBanner();
     renderMomentum();renderSideBets();renderRecap();renderTrash();renderPhotos();
@@ -1643,8 +1842,17 @@ function total(tid){return Object.values(scores[tid]||{}).reduce((a,b)=>a+(b||0)
 function front(tid){let t=0;for(let h=0;h<9;h++)t+=scores[tid]?.[h]||0;return t||null;}
 function back(tid){let t=0;for(let h=9;h<18;h++)t+=scores[tid]?.[h]||0;return t||null;}
 function toPar(tid){let d=0,c=0;for(let h=0;h<18;h++)if(scores[tid]?.[h]){d+=scores[tid][h]-PAR[h];c++;}return{diff:d,count:c};}
-function holeWinner(h){const s1=scores.team1?.[h],s2=scores.team2?.[h];if(!s1||!s2)return null;if(s1<s2)return'team1';if(s2<s1)return'team2';return'tie';}
+function strokesOn(tid,h){const n=handicaps[tid]||0;if(!n)return 0;const si=strokeIndex[h]||(h+1);let s=0;if(si<=n)s++;if(si<=n-18)s++;return s;}
+function netScore(tid,h){const g=scores[tid]?.[h];if(!g)return null;return g-strokesOn(tid,h);}
+function holeWinner(h){const s1=netScore('team1',h),s2=netScore('team2',h);if(s1==null||s2==null)return null;if(s1<s2)return'team1';if(s2<s1)return'team2';return'tie';}
 function matchTally(){let t1=0,t2=0,ties=0;for(let h=0;h<18;h++){const w=holeWinner(h);if(w==='team1')t1++;else if(w==='team2')t2++;else if(w==='tie')ties++;}return{t1,t2,ties};}
+function netTotal(tid){const t=total(tid);return t?t-(handicaps[tid]||0):t;}
+function champion(){const t1=netTotal('team1'),t2=netTotal('team2');if(!t1&&!t2)return null;if(t1&&t2)return t1<t2?'team1':t2<t1?'team2':'tie';return null;}
+function nassauResults(){const seg=(a,b)=>{let t1=0,t2=0;for(let h=a;h<b;h++){const w=holeWinner(h);if(w==='team1')t1++;else if(w==='team2')t2++;}return{t1,t2,winner:t1>t2?'team1':t2>t1?'team2':'tie'};};return{front:seg(0,9),back:seg(9,18),overall:seg(0,18)};}
+function skinsResults(){let carry=0,t1=0,t2=0;const holes=[];for(let h=0;h<18;h++){const w=holeWinner(h);if(w==null){holes.push({h,winner:null,val:0});continue;}const val=1+carry;if(w==='tie'){carry=val;holes.push({h,winner:'tie',val});}else{if(w==='team1')t1+=val;else t2+=val;carry=0;holes.push({h,winner:w,val});}}return{t1,t2,holes,carry};}
+function sideBetTally(){const c={};const add=(name,type)=>{if(!name)return;const k=String(name).trim();if(!k)return;if(!c[k])c[k]={name:k,ctpin:0,ldrive:0,total:0};c[k][type]++;c[k].total++;};Object.values(sidebetPlayers).forEach(sp=>{if(sp){add(sp.ctpin,'ctpin');add(sp.ldrive,'ldrive');}});return Object.values(c).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));}
+function mvp(){const t=sideBetTally();return t.length?t[0]:null;}
+function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 function showToast(msg,type='s'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type}`;el.style.display='block';setTimeout(()=>el.style.display='none',2400);}
 function pickTeam(tid){myTeam=tid;localStorage.setItem('kk_myteam',tid);renderAll();}
 function switchTeam(){myTeam=null;localStorage.removeItem('kk_myteam');renderAll();}
@@ -1670,7 +1878,7 @@ async function stepScore(tid,hole,delta){
   const group=document.getElementById(`step-${tid}-${hole}`);
   if(group){const val=group.querySelector('.step-val');if(val)val.textContent=nv;}
   else{renderTeamRows();renderWinnerRow();renderBanner();}
-  renderMomentum();renderRecap();checkAllScored();showUndoBtn();
+  renderMomentum();renderRecap();checkAllScored();maybeCelebrate();showUndoBtn();
 }
 function editStepVal(tid,hole){
   const group=document.getElementById(`step-${tid}-${hole}`);if(!group)return;
@@ -1687,6 +1895,16 @@ function checkAllScored(){
   if(lockBtn)lockBtn.style.display=allDone&&!roundLocked?'block':'none';
   const lockBar=document.getElementById('lock-bar');
   if(lockBar)lockBar.style.display=roundLocked?'flex':'none';
+  if(!allDone)localStorage.removeItem('kk_celebrated');
+}
+// Fire the trophy/confetti automatically the moment the final hole is entered (once per round).
+function maybeCelebrate(){
+  const allDone=PAR.every((_,h)=>scores.team1?.[h]&&scores.team2?.[h]);
+  if(allDone&&localStorage.getItem('kk_celebrated')!=='1'){
+    localStorage.setItem('kk_celebrated','1');
+    showToast('Round complete! 🏁');
+    setTimeout(openPrize,600);
+  }
 }
 function lockRound(){
   roundLocked=true;localStorage.setItem('kk_locked','1');
@@ -1755,7 +1973,7 @@ async function leStep(delta){
   lastAction={tid:myTeam,hole,prev:cur||null};
   scores[myTeam][hole]=nv;
   await upsertScore(myTeam,hole,nv);
-  showUndoBtn();renderLiveEntry();
+  showUndoBtn();renderLiveEntry();checkAllScored();maybeCelebrate();
 }
 function leNext(){
   if(currentLiveHole<17){currentLiveHole++;renderLiveEntry();}
@@ -1794,6 +2012,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 window.addEventListener('load',init);
+window.addEventListener('online',()=>{flushQueue();loadAll();showToast('Back online — syncing ↑');});
 window.addEventListener('resize',()=>{if(document.getElementById('tab-momentum')&&document.getElementById('tab-momentum').style.display!=='none')drawSwingChart();});
 </script>
 </body>
