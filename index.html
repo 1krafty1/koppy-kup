@@ -779,11 +779,24 @@ async function flushQueue(){
   if(!offlineQueue.length||!sb)return;
   const q=offlineQueue.slice();offlineQueue=[];localStorage.setItem('kk_queue','[]');
   for(const op of q){
-    try{const{error}=await sb.from('scores').upsert({team_id:op.tid,hole:op.hole,score:op.score},{onConflict:'team_id,hole'});if(error)throw error;}
-    catch(e){offlineQueue.push(op);}
+    try{
+      if(op.del){const{error}=await sb.from('scores').delete().match({team_id:op.tid,hole:op.hole});if(error)throw error;}
+      else{const{error}=await sb.from('scores').upsert({team_id:op.tid,hole:op.hole,score:op.score},{onConflict:'team_id,hole'});if(error)throw error;}
+    }catch(e){offlineQueue.push(op);}
   }
   localStorage.setItem('kk_queue',JSON.stringify(offlineQueue));
   if(offlineQueue.length)document.getElementById('sync-time').textContent=`⚠️ Offline — ${offlineQueue.length} queued`;
+}
+async function deleteScoreRemote(tid,hole){
+  try{
+    const{error}=await sb.from('scores').delete().match({team_id:tid,hole});
+    if(error)throw error;
+    document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
+    flushQueue();
+  }catch(e){
+    queueSave({tid,hole,del:true});
+    document.getElementById('sync-time').textContent=`⚠️ Offline — ${offlineQueue.length} change${offlineQueue.length!==1?'s':''} queued`;
+  }
 }
 async function saveSetting(key,value){await sb.from('settings').upsert({key,value},{onConflict:'key'});}
 
@@ -1418,6 +1431,12 @@ function renderRecap(){
 }
 
 // ── EXPORT ──
+function fitText(ctx,text,maxW){
+  if(ctx.measureText(text).width<=maxW)return text;
+  let t=text;
+  while(t.length>1&&ctx.measureText(t+'…').width>maxW)t=t.slice(0,-1);
+  return t+'…';
+}
 function buildScorecardCanvas(){
   const canvas=document.createElement('canvas');
   const dpr=2;
@@ -1472,8 +1491,10 @@ function buildScorecardCanvas(){
     ctx.fillStyle=ti===0?'#f0fdf4':'#fff5f5';ctx.fillRect(0,y,W,rowH);
     ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;ctx.strokeRect(0,y,W,rowH);
     const t=TEAMS[tid];
+    const pls=players[tid].filter(p=>p.trim()).join(', ');
     ctx.fillStyle=t.color;ctx.font='bold 11px sans-serif';ctx.textAlign='left';
-    ctx.fillText(`${t.emoji} ${names[tid]}`,8,y+22);
+    ctx.fillText(`${t.emoji} ${names[tid]}`,8,pls?y+15:y+22);
+    if(pls){ctx.fillStyle='#64748b';ctx.font='8px sans-serif';ctx.fillText(fitText(ctx,pls,110),8,y+27);}
     PAR.forEach((par,h)=>{
       const s=scores[tid]?.[h];
       const cx=startX+h*colW+colW/2,cy=y+rowH/2;
@@ -1713,15 +1734,16 @@ function cellClick(el){
   const tid=el.dataset.team;if(tid!==myTeam)return;
   if(editingCell)commitEdit();
   const hole=parseInt(el.dataset.hole),cur=scores[tid]?.[hole]||'';
-  el.outerHTML=`<div id="step-${tid}-${hole}" class="stepper-group"><button class="step-btn" onclick="stepScore('${tid}',${hole},-1)">−</button><span class="step-val" onclick="editStepVal('${tid}',${hole})">${cur||'·'}</span><button class="step-btn" onclick="stepScore('${tid}',${hole},1)">+</button></div>`;
+  el.outerHTML=`<div id="step-${tid}-${hole}" class="stepper-group"><button class="step-btn" onclick="stepScore('${tid}',${hole},-1)">−</button><span class="step-val" onclick="editStepVal('${tid}',${hole})">${cur||'·'}</span><button class="step-btn" onclick="stepScore('${tid}',${hole},1)">+</button><button class="step-btn" onclick="clearScore('${tid}',${hole})" title="Clear score" style="color:#dc2626;font-size:14px;">✕</button></div>`;
 }
 function ikey(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();commitEdit();}if(e.key==='Escape'){editingCell=null;renderTeamRows();renderWinnerRow();renderBanner();}}
 async function commitEdit(){
   const inp=document.getElementById('ai');if(!inp){editingCell=null;return;}
   const tid=inp.dataset.team,hole=parseInt(inp.dataset.hole),val=parseInt(inp.value);
-  const prev=scores[tid]?.[hole]||null;
+  const prev=scores[tid]?.[hole]??null;
   editingCell=null;
   if(!isNaN(val)&&val>0){lastAction={tid,hole,prev};scores[tid][hole]=val;await upsertScore(tid,hole,val);showUndoBtn();}
+  else if(prev!=null){lastAction={tid,hole,prev};delete scores[tid][hole];await deleteScoreRemote(tid,hole);showUndoBtn();}
   renderTeamRows();renderWinnerRow();renderBanner();renderMomentum();renderRecap();
   checkAllScored();maybeCelebrate();
 }
@@ -1871,7 +1893,9 @@ function swTab(name,btn){
 async function stepScore(tid,hole,delta){
   if(roundLocked&&!adminMode)return;
   const cur=scores[tid]?.[hole]||0;
-  const nv=Math.max(1,Math.min(15,(cur||0)+delta));
+  const target=(cur||0)+delta;
+  if(target<1){if(cur)await clearScore(tid,hole);return;}
+  const nv=Math.min(15,target);
   lastAction={tid,hole,prev:cur||null};
   scores[tid][hole]=nv;
   await upsertScore(tid,hole,nv);
@@ -1879,6 +1903,19 @@ async function stepScore(tid,hole,delta){
   if(group){const val=group.querySelector('.step-val');if(val)val.textContent=nv;}
   else{renderTeamRows();renderWinnerRow();renderBanner();}
   renderMomentum();renderRecap();checkAllScored();maybeCelebrate();showUndoBtn();
+}
+async function clearScore(tid,hole){
+  if(!myTeam||myTeam==='watch')return;
+  if(roundLocked&&!adminMode)return;
+  if(tid!==myTeam&&!adminMode)return;
+  const prev=scores[tid]?.[hole]??null;
+  if(prev!=null){
+    lastAction={tid,hole,prev};
+    delete scores[tid][hole];
+    await deleteScoreRemote(tid,hole);
+    showUndoBtn();
+  }
+  renderTeamRows();renderWinnerRow();renderBanner();renderMomentum();renderRecap();checkAllScored();
 }
 function editStepVal(tid,hole){
   const group=document.getElementById(`step-${tid}-${hole}`);if(!group)return;
@@ -1932,8 +1969,8 @@ async function undoLast(){
   const btn=document.getElementById('undo-btn');if(btn)btn.style.display='none';
   if(undoTimer)clearTimeout(undoTimer);
   if(prev===null||prev===undefined){
-    await sb.from('scores').delete().match({team_id:tid,hole});
     if(scores[tid])delete scores[tid][hole];
+    await deleteScoreRemote(tid,hole);
   }else{scores[tid][hole]=prev;await upsertScore(tid,hole,prev);}
   renderTeamRows();renderWinnerRow();renderBanner();renderMomentum();renderRecap();
   checkAllScored();showToast('Undone ↩');
@@ -1969,7 +2006,12 @@ function renderLiveEntry(){
 async function leStep(delta){
   if(roundLocked&&!adminMode)return;
   const hole=currentLiveHole,cur=scores[myTeam]?.[hole]||0;
-  const nv=Math.max(1,Math.min(15,(cur||0)+delta));
+  const target=(cur||0)+delta;
+  if(target<1){
+    if(cur){lastAction={tid:myTeam,hole,prev:cur};delete scores[myTeam][hole];await deleteScoreRemote(myTeam,hole);showUndoBtn();}
+    renderLiveEntry();checkAllScored();return;
+  }
+  const nv=Math.min(15,target);
   lastAction={tid:myTeam,hole,prev:cur||null};
   scores[myTeam][hole]=nv;
   await upsertScore(myTeam,hole,nv);
