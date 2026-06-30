@@ -367,6 +367,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
     <button class="tbtn" onclick="swTab('recap',this)">🎉 Recap</button>
     <button class="tbtn" onclick="swTab('setup',this)">⚙️ Setup</button>
     <button class="tbtn" onclick="swTab('liveentry',this)">🎯 Live Entry</button>
+    <button class="tbtn" onclick="swTab('gps',this)">📍 GPS</button>
   </div>
 
   <!-- SCORECARD -->
@@ -544,6 +545,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
   <div id="tab-liveentry" style="display:none;">
     <div id="le-wrap"></div>
   </div>
+  <div id="tab-gps" style="display:none;"></div>
 </div>
 
 <!-- PRIZE MODAL -->
@@ -699,6 +701,8 @@ let sidebetPlayers={};
 let savedCourses=[];
 let savedRounds=[];
 let offlineQueue=JSON.parse(localStorage.getItem('kk_queue')||'[]');
+let gpsData={team1:null,team2:null};
+let gpsWatchId=null;
 let myTeam=localStorage.getItem('kk_myteam')||null;
 let ttSender=localStorage.getItem('kk_ttsender')||null;
 let editingCell=null,scratchDone=false;
@@ -735,6 +739,7 @@ async function init(){
   buildHandicapInputs();
   buildPrizeInputs();
   setInterval(loadAll,15000);
+  if(localStorage.getItem('kk_gps')==='1')startGPS();
   sb.channel('kk')
     .on('postgres_changes',{event:'*',schema:'public',table:'scores'},()=>loadAll())
     .on('postgres_changes',{event:'*',schema:'public',table:'settings'},()=>loadAll())
@@ -770,6 +775,8 @@ async function loadAll(){
       if(r.key==='sidebet_players')try{const sp=JSON.parse(r.value);if(sp&&typeof sp==='object')sidebetPlayers=sp;}catch{}
       if(r.key==='saved_courses')try{const sc=JSON.parse(r.value);if(Array.isArray(sc))savedCourses=sc;}catch{}
       if(r.key==='saved_rounds')try{const sr=JSON.parse(r.value);if(Array.isArray(sr))savedRounds=sr;}catch{}
+      if(r.key==='team1_gps')try{const g=JSON.parse(r.value);if(g&&g.lat)gpsData.team1=g;}catch{}
+      if(r.key==='team2_gps')try{const g=JSON.parse(r.value);if(g&&g.lat)gpsData.team2=g;}catch{}
     });}
     if(hy)histYears=hy;
     document.getElementById('sync-time').textContent='Synced '+new Date().toLocaleTimeString();
@@ -852,6 +859,7 @@ function renderAll(){
   renderSetup();renderTeamPicker();
   renderMomentum();renderSideBets();
   renderHistory();renderRecap();
+  renderGPS();
   checkAllScored();
 }
 
@@ -2050,14 +2058,128 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 function showToast(msg,type='s'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type}`;el.style.display='block';setTimeout(()=>el.style.display='none',2400);}
 function pickTeam(tid){myTeam=tid;localStorage.setItem('kk_myteam',tid);renderAll();}
 function switchTeam(){myTeam=null;localStorage.removeItem('kk_myteam');renderAll();}
+// ── GPS ──
+function distYards(lat1,lng1,lat2,lng2){
+  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(a))*1.09361);
+}
+function gpsCurrentHole(tid){
+  const keys=Object.keys(scores[tid]||{}).map(Number);
+  return keys.length>0?Math.min(17,Math.max(...keys)+1):0;
+}
+async function updateGPSLocation(pos){
+  if(!myTeam||myTeam==='watch')return;
+  const data={lat:pos.coords.latitude,lng:pos.coords.longitude,hole:gpsCurrentHole(myTeam),ts:Date.now(),acc:Math.round(pos.coords.accuracy)};
+  gpsData[myTeam]=data;
+  try{await sb.from('settings').upsert({key:myTeam+'_gps',value:JSON.stringify(data)},{onConflict:'key'});}catch{}
+  renderGPS();
+}
+function startGPS(){
+  if(!navigator.geolocation){showToast('GPS not supported on this device','e');return;}
+  if(gpsWatchId!==null)return;
+  gpsWatchId=navigator.geolocation.watchPosition(
+    updateGPSLocation,
+    err=>{showToast('GPS: '+err.message,'e');},
+    {enableHighAccuracy:true,maximumAge:30000,timeout:15000}
+  );
+  localStorage.setItem('kk_gps','1');
+  showToast('📍 Sharing location with other team');
+  renderGPS();
+}
+function stopGPS(){
+  if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
+  localStorage.removeItem('kk_gps');
+  showToast('📵 Location sharing off');
+  renderGPS();
+}
+function renderGPS(){
+  const el=document.getElementById('tab-gps');
+  if(!el||el.style.display==='none')return;
+  const tid=myTeam&&myTeam!=='watch'?myTeam:null;
+  const oid=tid==='team1'?'team2':tid==='team2'?'team1':null;
+  const sharing=gpsWatchId!==null;
+  const myD=tid?gpsData[tid]:null;
+  const otherD=oid?gpsData[oid]:null;
+  // hole strip
+  const myH=tid?(myD?myD.hole:gpsCurrentHole(tid)):null;
+  const otherH=oid?(otherD?otherD.hole:gpsCurrentHole(oid)):null;
+  let strip='';
+  for(let h=0;h<18;h++){
+    const me=myH===h,other=otherH===h;
+    let bg,txt;
+    if(me&&other){bg='linear-gradient(135deg,#16a34a 50%,#dc2626 50%)';txt='<span style="font-size:7px;color:#fff">⚡</span>';}
+    else if(me){bg='#16a34a';txt=`<span style="color:#fff;font-size:9px">${h+1}</span>`;}
+    else if(other){bg='#dc2626';txt=`<span style="color:#fff;font-size:9px">${h+1}</span>`;}
+    else{bg='var(--bg3)';txt=`<span style="color:var(--mu);font-size:9px">${h+1}</span>`;}
+    strip+=`<div class="hs" style="background:${bg};display:flex;align-items:center;justify-content:center;">${txt}</div>`;
+  }
+  // distance card
+  let distCard='';
+  if(myD&&otherD){
+    const yds=distYards(myD.lat,myD.lng,otherD.lat,otherD.lng);
+    distCard=`<div style="text-align:center;padding:12px;background:#fff;border-radius:10px;border:1px solid var(--bor);margin-bottom:12px;">
+      <div style="font-size:10px;color:var(--mu);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Distance Between Teams</div>
+      <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--tx)">${yds.toLocaleString()}</div>
+      <div style="font-size:11px;color:var(--mu)">yards apart</div>
+    </div>`;
+  }
+  // team card builder
+  function teamCard(id,d,estH,isMe){
+    const c=id==='team1'?'#16a34a':'#dc2626';
+    const nm=names[id]||id;
+    const age=d?Math.round((Date.now()-d.ts)/60000):null;
+    const hNum=d?d.hole+1:estH+1;
+    return `<div style="background:#fff;border:2px solid ${c};border-radius:12px;padding:14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:700;color:${c}">${nm}${isMe?' (You)':''}</div>
+        ${isMe?(sharing?'<span style="font-size:10px;background:#dcfce7;color:#15803d;padding:3px 8px;border-radius:20px;font-weight:700;">📡 Live</span>':'<span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:3px 8px;border-radius:20px;">Off</span>'):(d?`<span style="font-size:10px;color:var(--mu)">${age===0?'just now':age+'m ago'}</span>`:'<span style="font-size:10px;color:var(--mu)">no data</span>')}
+      </div>
+      ${d?`<div style="display:flex;gap:8px;">
+        <div style="flex:1;text-align:center;background:var(--bg2);border-radius:8px;padding:10px;">
+          <div style="font-size:10px;color:var(--mu);margin-bottom:2px;">On Hole</div>
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:900">${hNum}</div>
+        </div>
+        <div style="flex:1;text-align:center;background:var(--bg2);border-radius:8px;padding:10px;">
+          <div style="font-size:10px;color:var(--mu);margin-bottom:2px;">GPS Accuracy</div>
+          <div style="font-size:16px;font-weight:700;color:${d.acc<=15?'#16a34a':d.acc<=50?'#d97706':'#dc2626'}">±${d.acc}m</div>
+        </div>
+      </div>`:`<div style="text-align:center;color:var(--mu);font-size:12px;padding:8px 0;">${isMe?'Tap Share below to start':'Waiting for their location…'}</div>`}
+    </div>`;
+  }
+  const myCard=tid?teamCard(tid,myD,myH!==null?myH:0,true):'<div style="text-align:center;color:var(--mu);font-size:12px;padding:14px;">Pick a team first to use GPS.</div>';
+  const otherCard=oid?teamCard(oid,otherD,otherH!==null?otherH:0,false):'';
+  el.innerHTML=`<div style="padding:14px 12px;">
+    <div class="sec-title">📍 Course GPS Tracker</div>
+    <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid var(--bor);">
+      <div style="font-size:10px;color:var(--mu);margin-bottom:8px;text-align:center;letter-spacing:.5px;">
+        <span style="color:#16a34a;font-weight:700">■</span> ${names.team1||'Team 1'} &nbsp;
+        <span style="color:#dc2626;font-weight:700">■</span> ${names.team2||'Team 2'}
+      </div>
+      <div class="hole-strip">${strip}</div>
+    </div>
+    ${distCard}
+    ${myCard}
+    ${otherCard}
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      ${sharing
+        ?`<button onclick="stopGPS()" style="flex:1;padding:13px;background:#dc2626;border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">📵 Stop Sharing Location</button>`
+        :`<button onclick="startGPS()" style="flex:1;padding:13px;background:var(--gb);border:none;border-radius:9px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">📍 Share My Location</button>`
+      }
+    </div>
+    <div style="text-align:center;font-size:10px;color:var(--mu);margin-top:8px;line-height:1.5;">Updates every ~30 sec • Only active while this app is open<br>Other team must also tap Share on their phone</div>
+  </div>`;
+}
+
 function swTab(name,btn){
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-  ['scorecard','momentum','trash','sidebets','photos','history','recap','setup','liveentry'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===name?'block':'none';});
+  ['scorecard','momentum','trash','sidebets','photos','history','recap','setup','liveentry','gps'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===name?'block':'none';});
   if(name==='momentum')setTimeout(drawSwingChart,50);
   if(name==='recap')renderRecap();
   if(name==='setup')renderSetup();
   if(name==='photos'){buildPhotoHoleSel();renderPhotos();}
   if(name==='liveentry')renderLiveEntry();
+  if(name==='gps')renderGPS();
 }
 
 
